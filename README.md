@@ -53,6 +53,15 @@ YOU (the expert)                    YOUR AI AGENT (the operator)
 
 **The knowledge worker provides the expertise. The agent provides the automation. The KB is the bridge.**
 
+**Two extraction modes — the agent picks the right one based on what you say:**
+
+| You say | Agent uses | KB contains | Downstream use |
+|---------|-----------|-------------|----------------|
+| "extract **rules** about AML thresholds" | `mode: rules` | IF-THEN with numeric thresholds | Monitoring, automation, recommendation systems |
+| "extract **knowledge** about cardiac treatment" | `mode: knowledge` | Q&A pairs with explanations | Reference KB, Claude Project prompt, fine-tuning |
+
+Signal words like "thresholds", "triggers", "criteria", "at what point" → rules mode. Words like "explain", "how does", "knowledge about" → knowledge mode. When ambiguous, the agent asks.
+
 This works for any domain: compliance analysts extracting AML thresholds, traders extracting basis risk rules, clinical researchers extracting trial criteria, insurance underwriters extracting classification rules. You extract once, validate, and your agents use it forever — improving the rules when reality proves them wrong.
 
 ## A factory for AI-driven recommendation systems

@@ -20,6 +20,23 @@ Extract structured domain knowledge or IF-THEN decision rules from an AI model's
 - Generate adversarially validated entries where each claim is challenged for evidence
 - Build training data for fine-tuning downstream models (feeds bdistill-export)
 
+## Choosing mode: knowledge vs rules
+
+**Use `mode: rules` when** the user needs IF-THEN logic for decision systems, monitoring, or automation. Signal words: "thresholds", "triggers", "rules", "criteria", "limits", "when should I", "at what point", "decision logic", "classification rules".
+
+**Use `mode: knowledge` when** the user needs reference material, explanations, or training data. Signal words: "explain", "how does X work", "what is", "knowledge base", "reference", "training data", "Q&A".
+
+**When ambiguous**, ask: "Do you need structured IF-THEN rules with numeric thresholds (for a decision system or monitoring), or Q&A reference knowledge (for a searchable KB or training data)?"
+
+| User says | Mode | Why |
+|-----------|------|-----|
+| "extract AML transaction thresholds" | rules | "thresholds" = numeric decision boundaries |
+| "extract knowledge about cardiac arrest treatment" | knowledge | "knowledge about" = reference Q&A |
+| "I need rules for my underwriting system" | rules | "rules for my system" = automation |
+| "build a KB on Kubernetes" | knowledge | "KB on" = reference material |
+| "what are the criteria for SAR filing?" | rules | "criteria" = decision conditions |
+| "help me understand FOMC mechanics" | knowledge | "understand" = explanatory |
+
 ## Input contract
 
 ```yaml

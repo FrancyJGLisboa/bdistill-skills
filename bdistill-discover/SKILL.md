@@ -78,6 +78,7 @@ fields:
 - User description too vague ("I work in finance"): Ask for specifics — "What decisions do you make day to day? What numbers matter?"
 - Domain too broad: Split into sub-domains. "Insurance" → "marine-cargo", "cyber-risk", "professional-liability"
 - User picks all topics: Suggest starting with thresholds + mechanisms (highest extraction value), defer precedents to second session
+- Choosing recommended_mode: If the user's work involves decisions, monitoring, or automation → recommend "rules". If they need reference material, explanations, or training data → recommend "knowledge". If they want forecasts → recommend "predict". When unclear, ask: "Are you building a decision system, or a reference knowledge base?"
 
 ## Example
 
