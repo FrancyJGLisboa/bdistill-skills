@@ -486,6 +486,49 @@ Every entry carries a `source_model` field, so you always know which model produ
 
 ---
 
+### "How does adversarial validation work? Is the model just checking its own homework?"
+
+Adversarial validation is the step that separates bdistill extraction from standard prompting. After every answer, the model is forced to attack its own claims through 3 structured challenges before the entry earns a quality score:
+
+```
+Question: "At what transaction threshold does BCB require enhanced due diligence?"
+
+First-pass answer: "Transactions above R$50,000 require EDD."
+  → vague, no citation, no exceptions
+
+Challenge 1 — EVIDENCE:
+  "What specific regulation states R$50,000? Cite the article number."
+  → Model adds: "BCB Circular 3978, Art. 12, §2"
+
+Challenge 2 — EDGE CASE:
+  "Does this apply to crypto transactions? What about cumulative thresholds?"
+  → Model adds: "Also applies to cumulative R$100,000 over 30 days.
+     Crypto transactions follow the same thresholds per BCB Normative 2024."
+
+Challenge 3 — CONTRADICTION CHECK:
+  "Earlier you mentioned R$10,000 for wire transfers. How does that relate?"
+  → Model clarifies: "R$10,000 is the reporting threshold (COAF),
+     R$50,000 is the EDD trigger. Different obligations."
+
+Final entry (what gets written to the KB):
+  "IF single_transaction > R$50,000 OR cumulative_30d > R$100,000
+   THEN trigger EDD per BCB Circular 3978 Art. 12 §2.
+   Note: R$10,000 is the separate COAF reporting threshold.
+   Applies equally to fiat and crypto (BCB Normative 2024)."
+  confidence: 0.91, tier: verified, tags: [self-corrected, evidence-cited]
+```
+
+The first-pass answer scored ~0.5 (vague, no citation). After 3 challenges it's 0.91 (specific regulation, exceptions covered, related thresholds clarified). The `self-corrected` tag means the model improved its own answer under pressure — which is actually a quality signal.
+
+**Is the model just checking its own homework?** Partially — yes, a model challenging itself is weaker than an external challenge. That's why bdistill also offers:
+- **`bdistill-validate`** (consistency probing): re-asks the same claim 5 times with different phrasings to check if the number is real or hallucinated — a different kind of validation
+- **Cross-model adversarial**: extract with Model A, challenge with Model B. Model B has no loyalty to Model A's claims
+- **Human review**: export as Excel or checklist, let a domain expert verify the entries that matter most
+
+Three layers: adversarial self-challenge (during extraction) → consistency probing (after extraction) → human spot-check (before deployment). Each catches different failure modes.
+
+---
+
 ### Known limitations
 
 **Standalone mode requires file I/O.** Skills that write JSONL/JSON to disk (extract, validate, export, operationalize) need an agent that can create files. Claude Code, Cursor, Codex CLI, VS Code Copilot (agent mode), Windsurf, and Cline all support this. Claude.ai (web chat), ChatGPT (without code interpreter), and mobile-only agents do not — for those platforms, install the bdistill MCP server (`pipx install bdistill`) which handles all file operations server-side.

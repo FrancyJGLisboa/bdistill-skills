@@ -133,11 +133,21 @@ Use this flow when bdistill MCP tools are unavailable.
    - Include specific numbers, named entities, dates where possible
    - Cite regulations, standards, or data sources by name
 
-3. **Self-challenge** (if adversarial mode, which is the default):
-   - After each answer, ask yourself: "What evidence supports this?"
-   - Ask: "What about edge cases or exceptions?"
-   - Ask: "Is this threshold based on data or intuition?"
-   - Revise the answer to address weaknesses before scoring
+3. **Adversarial self-challenge** (on by default — this is what separates extraction from prompting):
+
+   After EACH answer, run 3 challenges before moving to the next question:
+
+   **Challenge 1 — EVIDENCE**: "What specific evidence supports this? Cite a regulation number, dataset, study, or named source. If you cannot cite evidence, lower the confidence score."
+
+   **Challenge 2 — EDGE CASE**: "What's an exception or boundary condition where this breaks? What about [specific scenario that tests the limits]?" Revise the answer to include the exception.
+
+   **Challenge 3 — CONTRADICTION CHECK**: "Does this conflict with anything else in this KB? If you said X earlier but now say Y, reconcile or correct." (In standalone mode, re-read the JSONL file to check for conflicts with previously written entries.)
+
+   After all 3 challenges, revise the original answer to incorporate corrections, exceptions, and evidence. The revised answer — not the original — is what gets scored and written to the KB.
+
+   **Why this matters:** Without adversarial challenges, the model gives its first-pass answer — often vague, sometimes hallucinated, missing edge cases. After challenges, the same model produces entries with cited evidence, acknowledged exceptions, and corrected thresholds. Entries that survive 3 challenges earn the "verified" tier. Entries that were corrected during challenges are tagged `self-corrected` — which is actually a quality signal (the model knew enough to fix itself).
+
+   **Cross-model adversarial:** For even stronger validation, extract the initial answer from Model A, then run the 3 challenges using Model B. Model B has no loyalty to Model A's claims and will challenge more aggressively. Tag these entries `cross-model-challenged`.
 
 4. **Quality-score each entry** on a 0.0-1.0 scale:
    - 0.8-1.0 (verified): Specific numbers, named sources, adversarially defended
