@@ -150,19 +150,9 @@ Use `scripts/extract_engine.py challenge` for the adversarial rounds — same en
 - Novelty and validity anti-correlated: The most novel correspondences are often the least valid (speculative). That's expected. You're looking for the rare quadrant: high novelty AND high validity. Expect 5-10% survival rate.
 - Model rates its own re-instantiation as novel when it isn't: Use web search (grounded mode) to check if the correspondence has been published. If yes, lower the novelty score.
 
-## Example
+## Examples
 
-**Seed rule:** "In soybean basis trading, when interior basis widens beyond -50 cents during non-harvest months, it signals logistics disruption not demand weakness — and historically mean-reverts within 6-8 weeks as trucking capacity reallocates"
-
-**Skeleton:** "When a local price discount widens beyond a threshold during off-peak periods, it signals supply-chain friction not fundamental shift — and mean-reverts as flexible capacity reallocates to exploit the discount"
-
-**Re-instantiations that survived adversarial challenge:**
-
-1. **Labor markets** (novelty: 0.4, validity: 0.85): "When wages in a specific metro diverge >15% from national average during non-recession periods, it signals labor mobility friction — and mean-reverts within 12-18 months as remote work and relocation respond." *Where it breaks: labor can't reallocate as fast as trucks. But the structural pattern holds.*
-
-2. **Cloud computing spot pricing** (novelty: 0.75, validity: 0.82): "When AWS spot instance price in a specific region exceeds on-demand by >30% during non-peak hours, it signals capacity misallocation not demand surge — and mean-reverts within hours as workloads shift regions." *Non-obvious: commodity basis trading and cloud spot pricing as structural equivalents. Prediction: spot price mean-reversion speed should correlate with workload portability, just as basis mean-reversion correlates with truck availability.*
-
-3. **Microbial ecology** (novelty: 0.9, validity: 0.65): "When nutrient concentration in a microhabitat exceeds surrounding zones beyond a threshold during non-bloom conditions, it signals diffusion barrier not production spike — and normalizes as motile organisms migrate toward the gradient." *Highly novel but validity is borderline — the 'rational actor' assumption maps poorly to chemotaxis.*
+See `references/worked-examples.md` for 3 full worked examples showing different entry points.
 
 ## Composes with
 
