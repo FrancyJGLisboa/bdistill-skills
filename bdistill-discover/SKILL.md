@@ -73,14 +73,35 @@ fields:
 5. Write output as JSON to `data/discovery/{domain}-seeds.json`
 6. Suggest: "Run bdistill-extract with these terms: ..."
 
+## Detecting multi-domain causal chains
+
+When the user's query spans multiple domains connected by cause-and-effect, **do not flatten into one domain**. Instead, decompose into a **chain of linked extraction sessions**, each with its own domain name.
+
+**Signal words for causal chains:** "ripple effects", "consequences of", "impact on", "leads to", "as a result of", "downstream effects", "transmission from X to Y".
+
+**Output format for causal chains:**
+
+```yaml
+type: causal_chain
+domains:
+  - domain: string
+    seed_terms: string[]
+    mode: rules | knowledge
+    extracts_from: null | string  # Which upstream domain feeds this one
+    linkage_terms: string[]       # Terms that describe the connection to the next domain
+```
+
+The agent runs extraction sessions in **chain order** — upstream first, downstream second — because downstream rules may reference upstream thresholds ("IF oil price > $X" is an upstream threshold that feeds the downstream rule "IF ammonia cost > $Y THEN reduce application rate").
+
 ## Edge cases
 
 - User description too vague ("I work in finance"): Ask for specifics — "What decisions do you make day to day? What numbers matter?"
 - Domain too broad: Split into sub-domains. "Insurance" → "marine-cargo", "cyber-risk", "professional-liability"
 - User picks all topics: Suggest starting with thresholds + mechanisms (highest extraction value), defer precedents to second session
 - Choosing recommended_mode: If the user's work involves decisions, monitoring, or automation → recommend "rules". If they need reference material, explanations, or training data → recommend "knowledge". If they want forecasts → recommend "predict". When unclear, ask: "Are you building a decision system, or a reference knowledge base?"
+- **Multi-domain queries**: If the user's description crosses 2+ domains connected by causation, use the causal chain output format (see above). Do NOT force everything into one domain.
 
-## Example
+## Example 1: Single domain
 
 **Input:** "I do AML compliance audits for a Brazilian fintech"
 
@@ -106,7 +127,82 @@ fields:
 }
 ```
 
+## Example 2: Multi-domain causal chain
+
+**Input:** "I need decision rules for crude oil price and ripple effects on nitrogen fertilizers as consequence of geopolitical tensions in the Hormuz strait"
+
+This crosses 3 domains connected by causation:
+```
+Hormuz geopolitics → oil/gas price → nitrogen fertilizer cost → downstream ag impact
+```
+
+**Output:**
+```json
+{
+  "type": "causal_chain",
+  "summary": "Geopolitical tension in Hormuz strait → crude oil spike → natural gas spike → ammonia/urea production cost surge → fertilizer price impact → farmer application rate changes",
+  "domains": [
+    {
+      "domain": "energy-geopolitics-hormuz",
+      "order": 1,
+      "seed_terms": [
+        "Hormuz strait closure probability triggers and historical precedents",
+        "Iran-Saudi tension escalation ladder and oil supply disruption thresholds",
+        "Hormuz chokepoint: volume of oil transit (21M bbl/day) and bypass capacity",
+        "US Fifth Fleet response timelines and deterrence thresholds",
+        "insurance war-risk premium triggers for tanker transit Hormuz",
+        "oil price spike magnitude by disruption scenario: harassment vs blockade vs closure"
+      ],
+      "mode": "rules",
+      "extracts_from": null,
+      "linkage_to_next": "Oil price thresholds from disruption scenarios feed into energy-fertilizer linkage"
+    },
+    {
+      "domain": "energy-fertilizer-linkage",
+      "order": 2,
+      "seed_terms": [
+        "crude oil to natural gas price transmission: Henry Hub, TTF, JKM benchmarks",
+        "natural gas as feedstock for ammonia: cost share 70-90% of production cost",
+        "ammonia production cost curve by gas price: $2/MMBtu to $15/MMBtu scenarios",
+        "urea price as function of ammonia cost plus conversion margin",
+        "UAN-28 and UAN-32 pricing relative to urea and ammonia",
+        "nitrogen fertilizer supply elasticity: can production shift to non-gas regions?",
+        "China and Russia export restrictions on urea and ammonium nitrate triggers"
+      ],
+      "mode": "rules",
+      "extracts_from": "energy-geopolitics-hormuz",
+      "linkage_to_next": "Fertilizer price thresholds feed into application rate decisions"
+    },
+    {
+      "domain": "fertilizer-application-economics",
+      "order": 3,
+      "seed_terms": [
+        "nitrogen fertilizer cost as share of total crop production cost by crop",
+        "farmer application rate response to urea price: at what $/ton do farmers cut rates?",
+        "yield response curve to nitrogen application: diminishing returns thresholds",
+        "optimal vs economic nitrogen rate: when does marginal cost exceed marginal yield value?",
+        "regional differences: US corn belt vs Brazil cerrado vs EU wheat nitrogen economics",
+        "substitution options: precision application, biological nitrogen, cover crops, timing shifts"
+      ],
+      "mode": "rules",
+      "extracts_from": "energy-fertilizer-linkage",
+      "linkage_to_next": null
+    }
+  ],
+  "recommended_workflow": [
+    "1. Extract energy-geopolitics-hormuz rules first (upstream triggers)",
+    "2. Extract energy-fertilizer-linkage rules (transmission mechanism)",
+    "3. Extract fertilizer-application-economics rules (downstream impact)",
+    "4. Validate all 3 domains with bdistill-validate",
+    "5. Export all 3 as JSON, load together in bdistill-operationalize",
+    "6. Monitor: oil price from Yahoo Finance + gas from FRED + urea from market data",
+    "7. Predict: 'Will urea exceed $600/t if Hormuz tensions escalate?' with bdistill-predict grounded across all 3 KBs"
+  ]
+}
+```
+
 ## Composes with
 
-- **bdistill-extract**: Pass `seed_terms` as `custom_terms` and `domain` as the domain name
-- **bdistill-predict**: Pass `domain` for grounded predictions on the discovered domain
+- **bdistill-extract**: Pass `seed_terms` as `custom_terms` and `domain` as the domain name. For causal chains, run extractions in chain order (upstream first).
+- **bdistill-predict**: Pass `domain` for grounded predictions. For causal chains, the predict skill recalls from all linked domains.
+- **bdistill-operationalize**: Load rules from multiple domains simultaneously to monitor the full causal chain.

@@ -211,6 +211,66 @@ bdistill-extract(mode=rules) --> bdistill-validate --> bdistill-export(format=js
 bdistill-extract --> bdistill-export(format=harness-python) --> import RULES, build_prompt() in your code
 ```
 
+## Complex workflows: multi-domain causal chains
+
+Simple extraction handles one domain. Real-world decisions often span multiple domains connected by cause-and-effect. bdistill-skills handles this by decomposing causal chains into linked extraction sessions.
+
+**Example: "I need decision rules for crude oil price and ripple effects on nitrogen fertilizers from Hormuz strait geopolitical tensions"**
+
+This crosses 3 domains:
+```
+Hormuz geopolitics ──→ oil/gas prices ──→ nitrogen fertilizer costs ──→ farm-level impact
+     (cause)            (transmission)         (downstream effect)        (decision point)
+```
+
+The agent runs `bdistill-discover`, which detects the causal chain and decomposes it:
+
+```
+Session 1: domain="energy-geopolitics-hormuz"
+  Extract rules about: strait closure triggers, disruption scenarios,
+  oil price spike magnitudes, tanker war-risk premium thresholds
+  → 40 rules about WHEN and HOW MUCH oil spikes
+
+Session 2: domain="energy-fertilizer-linkage"
+  Extract rules about: gas-to-ammonia cost transmission, urea pricing
+  as function of ammonia cost, China/Russia export restriction triggers
+  → 35 rules about HOW oil price transmits to fertilizer cost
+
+Session 3: domain="fertilizer-application-economics"
+  Extract rules about: at what $/ton farmers cut nitrogen rates,
+  yield response curves to reduced application, substitution options
+  → 30 rules about WHAT FARMERS DO when fertilizer costs spike
+```
+
+Then chain the outputs:
+
+```
+bdistill-validate on all 3 domains → drop unstable thresholds
+
+bdistill-export all 3 as JSON → load together in bdistill-operationalize
+
+bdistill-operationalize with:
+  rules = [energy-geopolitics-hormuz.json,
+           energy-fertilizer-linkage.json,
+           fertilizer-application-economics.json]
+  data_sources = [yahoo-finance (oil), fred (gas), market-data (urea)]
+
+Output: "3 of 105 rules triggered across the chain:
+  [1] Oil price $94 > $90 threshold (Hormuz tension scenario B)
+  [2] Henry Hub gas $6.20 pushes ammonia cost above $500/t
+  [3] At urea >$580/t, corn belt farmers historically cut N rates 15-20%
+
+  Causal chain: Hormuz tension → oil spike → gas spike → ammonia cost
+  → urea above $580 → farmer N rate reduction → potential yield drag"
+```
+
+**105 validated rules across 3 domains, checked against 3 live data feeds, producing a causal chain recommendation.** The knowledge worker provided the question. The agent ran the factory.
+
+This same multi-domain pattern works for any causal chain:
+- Fed rate decision → credit spreads → mortgage rates → housing demand → construction materials
+- Cyber attack on port systems → shipping delays → container rates → retail inventory → consumer prices
+- Drought in Argentina → soy supply shock → crush margins → meal/oil prices → feed costs → protein prices
+
 ## Agent-first design
 
 These skills are designed to be called by agents, not just by humans:
