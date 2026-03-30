@@ -55,6 +55,55 @@ YOU (the expert)                    YOUR AI AGENT (the operator)
 
 This works for any domain: compliance analysts extracting AML thresholds, traders extracting basis risk rules, clinical researchers extracting trial criteria, insurance underwriters extracting classification rules. You extract once, validate, and your agents use it forever — improving the rules when reality proves them wrong.
 
+## A factory for AI-driven recommendation systems
+
+bdistill-skills is a repeatable pipeline. Pick a domain, run the assembly line, get a working recommendation system backed by validated knowledge. Then pick the next domain and do it again.
+
+```
+DOMAIN 1: AML Compliance              DOMAIN 2: Marine Insurance           DOMAIN 3: Your niche
+─────────────────────────              ──────────────────────────           ─────────────────────
+
+discover → "I audit banks"             discover → "I underwrite cargo"      discover → "I do X"
+    │                                      │                                    │
+extract → 50 AML rules                extract → 40 classification rules    extract → your rules
+    │                                      │                                    │
+validate → 43 stable, 7 dropped        validate → 35 stable, 5 dropped     validate → keep stable
+    │                                      │                                    │
+export → aml-compliance.json           export → marine-cargo.json           export → your-domain.json
+    │                                      │                                    │
+operationalize                         operationalize                       operationalize
+  + transaction feed                     + claims data                        + your data source
+    │                                      │                                    │
+    ▼                                      ▼                                    ▼
+"Flag account #4821 for EDD —          "Refer to senior underwriter —       Your agent recommends
+ cumulative R$127K > R$100K limit,      hull age 23y exceeds 20y limit,      based on your rules
+ confidence 0.91"                       piracy zone transit, conf 0.89"      vs current data
+```
+
+**Same pipeline, different domain, different data source, different recommendations. The factory pattern is:**
+
+1. **Pick a domain** — any niche where decisions depend on thresholds, rules, or expert judgment
+2. **Extract a KB** — 30-100 validated rules with confidence scores and consistency checks
+3. **Wire it to data** — connect the exported rules to whatever data your agents already access (APIs, CSVs, databases, web search)
+4. **Agent recommends** — your agent loads the KB, checks each rule against current data, and recommends with citations
+
+**What you can build with this pattern:**
+
+| Domain | KB contains | Data source | Agent recommends |
+|--------|------------|-------------|------------------|
+| AML compliance | Transaction monitoring thresholds | Transaction feed | Flag accounts, trigger EDD reviews |
+| Insurance underwriting | Risk classification rules | Claims + vessel data | Accept, refer, or decline with cited criteria |
+| Commodities trading | Basis risk, crush margin thresholds | Market prices (Yahoo Finance) | Trade signals with confidence |
+| Clinical trials | Eligibility criteria, adverse event rules | Patient data | Screen patients, flag safety events |
+| Pharma regulatory | ANVISA submission requirements | Submission tracker | Compliance gaps, missing documents |
+| Real estate operations | Rent roll standards, comp analysis rules | Property data | Pricing recommendations, anomaly flags |
+| Crop monitoring | Weather-yield thresholds by region | Weather API (Open-Meteo) | Yield risk alerts with impact estimates |
+| Macro research | Rate decision rules, yield curve signals | FRED economic data | Regime change alerts, positioning signals |
+
+**Each row is one run of the factory.** The compliance officer builds row 1. The underwriter builds row 2. The trader builds row 3. They all use the same 7 skills in the same sequence — only the domain knowledge and data source change.
+
+**The KB is the moat.** Anyone can build an agent. Not everyone has 50 validated, adversarially tested, consistency-probed decision rules for Brazilian AML compliance. That's what bdistill-skills produces — and it compounds every time you re-extract on the gaps.
+
 ## Install
 
 ```bash
