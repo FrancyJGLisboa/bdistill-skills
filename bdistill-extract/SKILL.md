@@ -170,7 +170,31 @@ Session 3:  domain="aml-compliance-brazil", custom_terms=["crypto AML", "travel 
             → 20 MORE entries merged (now 75, deduplicated)
 ```
 
-**The domain name is the key.** Different terms, different sessions, different days — as long as the domain name is the same, everything compounds into one KB.
+**The domain name is the key.** Different terms, different sessions, different days, **different models** — as long as the domain name is the same, everything compounds into one KB.
+
+### Multi-model extraction
+
+You can extract from Claude, GPT, Gemini, Llama, or any other model into the same KB. Each entry carries a `source_model` field so you always know where it came from.
+
+```
+Session 1:  model=Claude Opus, domain="aml-compliance-brazil", terms=["BCB 3978"]
+            → 30 entries, each tagged source_model="claude-opus-4-6"
+
+Session 2:  model=GPT-4o, domain="aml-compliance-brazil", terms=["SAR thresholds"]
+            → 25 entries merged into SAME file, tagged source_model="gpt-4o"
+
+Session 3:  model=Llama 3.1 70B (via Ollama), domain="aml-compliance-brazil"
+            → 20 entries merged, tagged source_model="llama-3.1-70b"
+```
+
+Result: one KB with 75 entries from 3 models. Deduplication keeps the higher-quality version when two models answer the same question.
+
+**Why this is valuable:**
+- **Cross-model validation**: If Claude says the SAR threshold is R$50,000 and GPT also says R$50,000, that's stronger evidence than either alone
+- **Coverage**: Different models have different training data — one might know BCB circulars better, another might know FATF guidelines better
+- **Consistency probing across models**: Run `bdistill-validate` and entries where models disagree on the number are flagged as unstable — that's a real signal
+
+**The caution:** Different models may use different terminology for the same concept ("SAR" vs "STR", "EDD" vs "enhanced due diligence"). Deduplication is by question text similarity, so slightly different phrasings may both survive. This is fine — downstream consumers (export, operationalize) handle synonyms. If you want to force deduplication, use the exact same custom_terms across models.
 
 **The footgun:** If you accidentally use a different domain name, you split your KB:
 

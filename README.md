@@ -466,6 +466,26 @@ Deduplication is automatic: if two sessions produce answers to the same question
 
 ---
 
+### "If extraction is in-session with one model, what about other LLMs? How do extractions from different models route to the same KB?"
+
+**The domain name is the merge key, not the model.** Extract from Claude on Monday, GPT on Tuesday, Llama locally on Wednesday — as long as you use the same domain name, all entries compound into one KB file.
+
+```
+Claude session:  domain="aml-compliance-brazil" → 30 entries (source_model: claude-opus-4-6)
+GPT session:     domain="aml-compliance-brazil" → 25 entries merged into same file (source_model: gpt-4o)
+Llama session:   domain="aml-compliance-brazil" → 20 entries merged (source_model: llama-3.1-70b)
+Result: 1 file, 75 entries, 3 models
+```
+
+Every entry carries a `source_model` field, so you always know which model produced it. Deduplication keeps the higher-quality version when two models answer the same question differently.
+
+**This is actually a feature, not a limitation.** Multi-model extraction gives you:
+- **Cross-validation**: If Claude and GPT agree on a threshold, it's more likely real
+- **Better coverage**: Different models have different training data strengths
+- **Stronger consistency probing**: Run `bdistill-validate` on a multi-model KB — entries where models disagree on the number get flagged as unstable, which is a genuine signal worth investigating
+
+---
+
 ### Known limitations
 
 **Standalone mode requires file I/O.** Skills that write JSONL/JSON to disk (extract, validate, export, operationalize) need an agent that can create files. Claude Code, Cursor, Codex CLI, VS Code Copilot (agent mode), Windsurf, and Cline all support this. Claude.ai (web chat), ChatGPT (without code interpreter), and mobile-only agents do not — for those platforms, install the bdistill MCP server (`pipx install bdistill`) which handles all file operations server-side.
