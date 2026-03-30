@@ -19,8 +19,10 @@ This repository contains 7 composable AI skills for structured knowledge extract
 
 ```
 bdistill-discover → bdistill-extract → bdistill-validate → bdistill-export → bdistill-operationalize
-                          ↓
-                    bdistill-predict
+                          ↓                   ↑
+                    bdistill-predict     bdistill-abstract
+                                              ↑
+                               (re-instantiated rules feed back into validate)
 ```
 
 Each skill's output contract matches the next skill's input contract. Chain them by passing outputs as inputs.

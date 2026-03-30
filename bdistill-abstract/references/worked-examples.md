@@ -187,6 +187,92 @@ FILTERED OUT:
 
 ## What to do with the survivors
 
+---
+
+## Example 4: A healthy failure — zero survivors (this is correct behavior)
+
+Not every rule transfers. The pipeline is designed to kill weak correspondences. Here's what it looks like when nothing survives.
+
+**You say:**
+> "Abstract this ANVISA regulation and find cross-domain equivalents in energy trading and software engineering: 'IF clinical trial Phase III fails to meet primary endpoint with p < 0.05 AND sponsor has not filed for protocol amendment within 60 days THEN ANVISA automatically suspends the IND and requires new pre-clinical data package per RDC 9/2015 Art. 42'"
+
+**The agent:**
+
+```
+ABSTRACTION ATTEMPT:
+
+  Domain-specific: [the full ANVISA rule above]
+
+  Structural: "IF a multi-stage approval process fails its primary
+    criterion AND the applicant doesn't request modification within
+    a regulatory deadline THEN the authority reverts the process to
+    an earlier stage requiring new foundational evidence"
+
+  Universal: "IF test fails AND no corrective action within deadline
+    THEN revert to earlier stage"
+
+DEDUP: Only 1 seed rule, no dedup needed.
+
+RE-INSTANTIATION:
+
+  Energy trading:
+    "IF a power plant capacity test fails to meet minimum output AND
+     the operator doesn't file remediation plan within 60 days THEN
+     the grid operator revokes capacity market qualification"
+    → Structural match: partial. Both have fail → deadline → revert.
+    → But: the "new foundational evidence" concept has no equivalent
+      in capacity markets (you just retest, you don't start over).
+
+  Software engineering:
+    "IF a production deployment fails acceptance tests AND the team
+     doesn't file a rollback within the SLA window THEN CI/CD pipeline
+     reverts to last known good state"
+    → Structural match: surface-level. Both have fail → deadline → revert.
+    → But: software rollback is instantaneous and automated; regulatory
+      reversion requires months of new pre-clinical work. The TIME
+      SCALE and REVERSIBILITY are fundamentally different.
+
+NOVELTY CHECK (Step 3a):
+  Energy: Query 3 (target-only) finds: capacity market qualification rules
+    are well-documented in PJM/MISO tariffs. Novelty: 0.2 (known).
+    → FILTERED OUT before adversarial round.
+
+  Software: Query 3 finds: CI/CD rollback patterns are extensively
+    documented. Novelty: 0.1 (textbook).
+    → FILTERED OUT before adversarial round.
+
+RESULT:
+  Started with:     1 seed × 2 targets = 2 candidates
+  After novelty:    0 candidates (both known in target domains)
+  After adversarial: N/A (nothing to challenge)
+  After round-trip:  N/A
+  Survival rate:     0/2 = 0%
+
+  WHY NOTHING SURVIVED: The seed rule is heavily regulatory — its structure
+  is tied to a specific institutional process (multi-stage approval with
+  statutory deadlines). Regulatory processes DON'T abstract well because
+  their structure comes from legal text, not from underlying mechanisms.
+  The "fail → deadline → revert" skeleton is too generic (universal level)
+  and the structural level adds regulatory specifics that are jurisdiction-bound.
+
+  RECOMMENDATION: Try extracting the MECHANISM underneath the regulation
+  instead of the regulation itself. E.g., "Why does Phase III failure
+  with no amendment lead to full reversion?" → because the regulatory
+  body treats unaddressed failure as evidence that the foundational
+  hypothesis is wrong. THAT mechanism might transfer.
+```
+
+**This is a correct result, not a bug.** The pipeline correctly identified that:
+1. The re-instantiations were already known in target domains (novelty killed them)
+2. The structural match was surface-level (fail → deadline → revert is too generic)
+3. Regulatory rules abstract poorly because their structure is institutional, not mechanistic
+
+The recommendation ("extract the mechanism underneath the regulation") is the actionable output of a failure — it tells you what to try next.
+
+---
+
+## What to do with the survivors
+
 Each surviving correspondence is a **hypothesis** with testable predictions. Three next steps:
 
 1. **Validate in the target domain:** Run `bdistill-validate` on the re-instantiated rules. Do the thresholds hold when re-asked 5 ways in target-domain vocabulary?

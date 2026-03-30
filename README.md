@@ -178,10 +178,10 @@ Skills are composable — each skill's output is the next skill's input.
 
 ```
 bdistill-discover --> bdistill-extract --> bdistill-validate --> bdistill-export --> bdistill-operationalize
-                            |                                        |
-                            v                                        v
-                      bdistill-predict                         bdistill-abstract
-                                                              (cross-domain transfer)
+                            |                   ↑                    |
+                            v                   |                    v
+                      bdistill-predict     bdistill-abstract --------┘
+                                          (re-instantiated rules feed back into validate)
 ```
 
 The shared data format is JSONL — one line per knowledge entry or rule. Every skill reads and writes the same format, so an agent can chain them without glue code.

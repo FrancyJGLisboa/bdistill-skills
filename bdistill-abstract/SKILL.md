@@ -114,12 +114,24 @@ Use the **structural** skeleton, not the universal one.
 
 **Do not ask the model "how novel is this?"** — the model's answer reflects what it saw in training data, which is exactly the corpus you're trying to go beyond.
 
-Instead, **search the web** for each candidate correspondence:
-- Search: `"{source concept}" AND "{target concept}" structural analogy` or `"{source concept}" isomorphic "{target concept}"`
-- Search: the specific claim in academic databases (Google Scholar, arXiv, SSRN)
-- If you find the correspondence published: floor novelty to 0.0-0.3 (known)
-- If you find adjacent work but not the exact claim: score 0.4-0.6 (partially known)
-- If you find nothing: score 0.7-1.0 (candidate for genuine discovery)
+Instead, **search the web** with 3 query variants per candidate — each catches a different way the correspondence could already be known:
+
+**Query 1 — Analogy framing** (catches interdisciplinary papers):
+`"{source concept}" "{target concept}" analogy OR isomorphic OR structural parallel`
+
+**Query 2 — Domain-pair framing** (catches applied work that uses both concepts):
+`"{source concept}" "{target concept}"` (just both terms together, no framing words)
+
+**Query 3 — Target-domain-only framing** (catches when the re-instantiated rule is already known WITHIN the target domain, even if nobody connected it to your source):
+Search for the re-instantiated rule's claim in target-domain vocabulary only, without mentioning the source domain at all.
+
+This third query is critical. If the re-instantiated rule is already well-known in the target domain, the cross-domain correspondence isn't a discovery — it's just recognizing something that target-domain experts already know.
+
+**Scoring:**
+- If ANY query finds the correspondence published: floor novelty to 0.0-0.3 (known)
+- If queries find adjacent work but not the exact claim: score 0.4-0.6 (partially known)
+- If all 3 queries find nothing: score 0.7-1.0 (candidate for genuine discovery)
+- If queries return nothing but the topic is too niche for web indexing: mark as `"novelty_grounding": "ungrounded"` and increase adversarial rigor to compensate
 
 **This step runs BEFORE adversarial validation** — don't waste adversarial rounds on correspondences that are already published.
 
@@ -151,11 +163,27 @@ For each surviving correspondence, test the reverse direction:
 3. Re-instantiate that skeleton back into the source domain
 4. Compare to the original seed rule
 
-**Round-trip score:**
-- 1.0: Recovered the original rule exactly (or a known equivalent)
-- 0.7-0.9: Recovered a related rule in the source domain (looser but valid)
-- 0.3-0.6: Recovered something in the same area but structurally different
-- 0.0-0.2: Failed to recover anything recognizable — the analogy is one-directional
+**Round-trip comparison rubric** (do NOT use string similarity — the wording will differ):
+
+Score each of 4 structural features. Round-trip score = average.
+
+| Feature | 1.0 | 0.5 | 0.0 |
+|---------|-----|-----|-----|
+| **Mechanism** | Same causal mechanism recovered (e.g., arbitrage → arbitrage) | Related mechanism (e.g., arbitrage → competition) | Different mechanism entirely |
+| **Equilibrium** | Same equilibrium condition (e.g., return = cost) | Similar equilibrium (e.g., return ≈ cost with friction) | No equilibrium or different type |
+| **Agents** | Same agent model (e.g., rational profit-seekers) | Related agents (e.g., optimizing entities, not necessarily rational) | Different agent model (e.g., stochastic process, no agents) |
+| **Directionality** | Same direction recovered (entry compresses spread) | Partially recovered (entry affects spread, direction unclear) | Wrong direction or no dynamic |
+
+**Example:**
+- Seed: "arbitrageurs enter → spread compresses to cost-of-carry"
+- Round-trip recovery: "profit-seeking traders exploit the gap → spread narrows toward carrying cost"
+- Scores: mechanism 1.0 (arbitrage), equilibrium 1.0 (return=cost), agents 1.0 (profit-seekers), directionality 1.0 (entry → compression)
+- Round-trip score: **1.0**
+
+- Seed: "arbitrageurs enter → spread compresses"
+- Round-trip recovery: "competitive pressure increases → margins decline over time"
+- Scores: mechanism 0.5 (competition, not exactly arbitrage), equilibrium 0.5 (margins decline, not pinned to specific cost), agents 0.5 (competitive pressure, not specific actors), directionality 1.0 (entry → compression)
+- Round-trip score: **0.625**
 
 **Keep only:** round_trip_score >= min_round_trip (default 0.5). One-directional analogies are surface-level — they sound right but the structural mapping doesn't actually hold.
 
