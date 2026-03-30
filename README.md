@@ -1,8 +1,10 @@
 # bdistill-skills
 
-**Protocols that distill real knowledge from LLM sessions into custom knowledge bases.**
+**Everyone is building AI agents. But generic agents make generic decisions.**
 
-7 composable skills that extract structured intelligence from the AI models you already use — decision rules with numeric thresholds, validated Q&A pairs, structured predictions with evidence. The distilled knowledge persists as a searchable, quality-scored KB that downstream AI agents can consume: recommendation systems, monitoring agents, fine-tuned local models, or just a Claude Project that finally gives consistent answers.
+Your agents need niche domain knowledge to be actually useful — the thresholds, rules, and edge cases that separate a junior from a senior in your field. That knowledge exists inside LLMs, but it's trapped in ephemeral chat sessions. bdistill-skills extracts it into structured, validated knowledge bases that make your agents smart on your niche.
+
+7 composable protocols that distill real intelligence from the AI models you already use — decision rules with numeric thresholds, validated Q&A pairs, structured predictions with evidence. The distilled knowledge persists as a searchable, quality-scored KB that your AI agents consume downstream: specialized assistants, monitoring systems, recommendation engines, fine-tuned local models, or just a Claude Project that finally gives consistent domain answers.
 
 Works with Claude Code, VS Code Copilot, Cursor, Codex CLI, Windsurf, Cline, and 30+ other agents. No API key. No MCP server. No dependencies.
 
