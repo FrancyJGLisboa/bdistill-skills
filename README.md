@@ -266,10 +266,104 @@ Output: "3 of 105 rules triggered across the chain:
 
 **105 validated rules across 3 domains, checked against 3 live data feeds, producing a causal chain recommendation.** The knowledge worker provided the question. The agent ran the factory.
 
-This same multi-domain pattern works for any causal chain:
-- Fed rate decision → credit spreads → mortgage rates → housing demand → construction materials
-- Cyber attack on port systems → shipping delays → container rates → retail inventory → consumer prices
-- Drought in Argentina → soy supply shock → crush margins → meal/oil prices → feed costs → protein prices
+### More causal chains that extract reliably
+
+These work well because LLMs have deep quantitative training data on the transmission mechanisms — academic papers, central bank research, USDA reports, actuarial studies, regulatory filings. The thresholds are real, not hallucinated.
+
+**Reliability rating:** How likely the extracted thresholds are stable (pass bdistill-validate consistency probing).
+
+#### High reliability (well-documented transmission mechanisms, quantitative literature)
+
+**Central bank policy → real economy**
+```
+Fed funds rate change → Treasury yield curve shift → corporate credit spreads widen
+→ mortgage rate increase → housing demand decline → construction materials demand drop
+→ lumber/copper price decline
+```
+Why reliable: Fed transmission mechanism is the most studied topic in economics. Thousands of papers with specific elasticities. LLMs have IMF working papers, Fed FEDS notes, BIS quarterly reviews in training data.
+
+**El Nino/La Nina → global food prices**
+```
+ENSO phase shift → regional precipitation anomalies (Australia, India, Brazil, US)
+→ crop yield deviations by region and crop → export supply changes
+→ CBOT futures price moves → FOB price adjustments → importing country food CPI
+```
+Why reliable: NOAA, USDA FAS, FAO, World Bank Commodity Markets Outlook all publish quantified ENSO-crop-price relationships. LLMs have USDA ERS research reports with specific yield impact coefficients per region.
+
+**Basel III/IV capital rules → credit availability**
+```
+New capital requirement announced → bank RWA calculation changes
+→ capital buffer squeeze → lending standard tightening (Senior Loan Officer Survey)
+→ credit spread widening → corporate borrowing cost increase
+→ capex reduction for marginal borrowers → sector-specific output effects
+```
+Why reliable: BIS publishes quantitative impact studies. Every major bank publishes capital adequacy reports. The transmission lags and magnitudes are studied extensively.
+
+**Drug patent cliff → healthcare costs**
+```
+Blockbuster drug patent expires → generic/biosimilar entry within 6-18 months
+→ drug price drops 80-90% (small molecule) or 30-50% (biosimilar)
+→ PBM formulary changes → insurance reimbursement rate adjustments
+→ hospital pharmacy budget reallocation → physician prescribing pattern shift
+```
+Why reliable: FDA Orange Book data, CMS pricing data, IQVIA market reports all have specific timelines and price erosion curves. This is actuarial-grade data.
+
+**Oil sanctions → downstream industrial costs**
+```
+Sanctions on oil-producing country → crude supply reduction (quantified by IEA)
+→ refinery margin changes → diesel/jet fuel price spike
+→ freight/logistics cost increase (fuel surcharge formulas are public)
+→ manufactured goods input cost increase → PPI by sector → selective CPI pass-through
+```
+Why reliable: IEA Oil Market Reports, EIA Short-Term Energy Outlook, and shipping industry fuel surcharge formulas are all quantitative and public.
+
+#### Medium reliability (mechanisms understood, some thresholds may vary)
+
+**Cyber attack on critical infrastructure → economic disruption**
+```
+Ransomware hits port management system → port operations halt 3-14 days
+→ vessel queue builds → container redirect to alternate ports (capacity constrained)
+→ spot freight rate spike → import delay → retailer inventory drawdown
+→ selective stockout → consumer substitution
+```
+Why medium: NIST and insurance actuarial models have scenario data, but specific thresholds (days of disruption, freight rate multipliers) vary by incident. LLMs have NotPetya/Colonial Pipeline case studies but may overgeneralize.
+
+**Sovereign credit downgrade → capital flight**
+```
+Rating agency downgrades sovereign debt → bond yield spike (basis points vary by tier)
+→ currency depreciation → central bank intervention (reserve drawdown)
+→ import cost increase → domestic inflation → consumer purchasing power erosion
+→ political pressure for fiscal response
+```
+Why medium: Transmission is well-studied (Reinhart & Rogoff, IMF), but the specific basis point moves and currency impacts are highly country-dependent. LLMs will give good frameworks but thresholds need per-country calibration.
+
+**Supply chain reshoring/friendshoring → cost structure**
+```
+Tariff or policy shock → company evaluates reshoring vs tariff absorption
+→ capex for new facility (18-36 month lead time) → labor market tightening in target region
+→ unit cost increase 15-30% (BCG/McKinsey estimates) → pricing decision (absorb vs pass-through)
+→ competitor response → market share rebalancing
+```
+Why medium: McKinsey, BCG, Kearney publish reshoring cost studies. LLMs have these but the specific cost premiums are rapidly evolving post-2023.
+
+#### Lower reliability (use for scenario framing, validate thresholds externally)
+
+**AI regulation → tech sector → broader market**
+```
+EU AI Act enforcement begins → compliance cost for covered AI systems
+→ smaller AI companies can't afford compliance → consolidation/exits
+→ reduced AI startup investment → tech sector valuation compression
+→ index-level impact (tech weight in S&P 500)
+```
+Why lower: This chain is plausible but the EU AI Act enforcement is too recent (2024-2025) for LLMs to have reliable quantitative impact data. Thresholds will be speculative. Use for scenario framing, then ground with web search via bdistill-predict --grounded.
+
+**Climate transition → stranded assets → financial stability**
+```
+Carbon pricing reaches $X/ton → coal/oil assets become uneconomic
+→ asset writedowns on bank balance sheets → capital adequacy pressure
+→ credit tightening in carbon-intensive sectors → economic restructuring
+```
+Why lower: The mechanism is well-described (Mark Carney speeches, NGFS scenarios) but the specific carbon price threshold where assets strand varies wildly across models ($50-$250/ton depending on assumptions). LLMs will give a range, not a threshold. Useful for scenario analysis, not for deterministic rules.
 
 ## Agent-first design
 
