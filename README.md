@@ -251,6 +251,82 @@ python -c "from bdistill import DATA_ROOT; print(DATA_ROOT)"
 
 Or just look for a `data/` folder next to where you launched VS Code.
 
+---
+
+### "How does it force the LLM to distill specific intelligence into a KB? What makes this different from standard prompting? Are these just markdown instructions?"
+
+Yes, they are markdown instructions. And that's the point — but what the instructions *encode* is a **multi-pass extraction protocol** that produces fundamentally different output than a single prompt ever could. Here's what's actually happening under the hood:
+
+**Standard prompting:**
+```
+You: "What are the AML thresholds for Brazilian fintechs?"
+AI:  "Generally, transactions above R$10,000 should be monitored... [vague, generic, no structure]"
+```
+
+One question, one answer, gone forever. No validation. No structure. No persistence. Ask again tomorrow, get a slightly different answer.
+
+**What bdistill-extract does with the same topic:**
+
+```
+Step 1 — SEED: Your custom terms ("BCB Circular 3978", "SAR filing thresholds")
+  are decomposed into 30-50 targeted questions, each designed to extract a
+  different facet: thresholds, mechanisms, exceptions, edge cases, precedents.
+  Not one question — thirty.
+
+Step 2 — EXTRACT: The AI answers each question in detail (100+ words, forced
+  to include specific numbers, named regulations, concrete conditions).
+  The instructions explicitly say: "Use concrete numeric thresholds:
+  'IF transaction > R$50,000' not 'IF transaction is large'."
+
+Step 3 — CHALLENGE: Each answer is adversarially probed. The AI is told to
+  attack its own claims:
+  - "What evidence supports that R$50,000 threshold?"
+  - "Does this apply to crypto transactions?"
+  - "What about structured transactions just below the limit?"
+  The AI corrects itself, adds exceptions, cites specific regulations.
+  Entries that survive challenges get higher confidence scores.
+
+Step 4 — SCORE: Each entry is quality-scored (0.0-1.0) based on:
+  - Specificity (named entities, exact numbers vs vague language)
+  - Evidence cited (regulation numbers, data sources)
+  - Precision (IF-THEN with thresholds vs prose descriptions)
+  Entries below 0.4 are dropped. Entries above 0.8 are marked "verified."
+
+Step 5 — PERSIST: Entries are written as structured JSONL — one record per
+  rule with typed fields (conditions, action, confidence, domain, tags).
+  Not a chat log. A queryable, filterable, exportable dataset.
+
+Step 6 — DEDUPLICATE: Run it again next week with different terms. Same
+  domain file. If a similar question already exists, the higher-quality
+  version is kept. The KB compounds, not duplicates.
+
+Step 7 — VALIDATE: bdistill-validate re-asks each numeric claim 5 times
+  with different phrasings. If the AI says "R$50,000" every time → stable,
+  real knowledge. If it says R$50K, R$80K, R$100K, R$75K, R$100K →
+  unstable, probably hallucinated. Flag or drop.
+```
+
+**That's 7 steps where standard prompting has 1.** The difference isn't the markdown — it's the protocol the markdown encodes.
+
+**What you get at the end:**
+
+| Standard prompting | bdistill extraction |
+|---|---|
+| A chat response that disappears | A persistent JSONL file on disk |
+| Vague: "transactions should be monitored" | Specific: `IF single_transaction > R$50,000 THEN trigger EDD` |
+| One answer, no validation | 30+ answers, adversarially challenged |
+| No quality signal | Confidence score 0.0-1.0, verified/solid/approximate tiers |
+| No consistency check | Stability score: real knowledge vs hallucinated |
+| Ask again, get different answer | Same file, deduplicates, compounds across sessions |
+| Can't export | Export as prompt, JSON, Python module, Excel, training JSONL |
+| Can't operationalize | Feed to monitoring system, check against live data |
+
+**"Are these just markdown files?"**
+
+Yes. And a recipe is just text on paper. The value isn't the paper — it's that the recipe encodes a specific sequence of actions that produces a predictable result. These markdown files encode extraction protocols that turn a general-purpose LLM into a structured knowledge extraction pipeline. The LLM follows the protocol because the instructions are precise enough to constrain its behavior: force specificity, challenge claims, score quality, persist output, deduplicate, validate.
+
+A single prompt says "tell me about AML." These skills say "generate 30 targeted questions from these seed terms, answer each with specific thresholds, challenge every claim, score quality, write structured output, validate consistency, export in 6 formats." That's the difference.
+
 ## License
 
 MIT
