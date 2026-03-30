@@ -1,8 +1,10 @@
 # bdistill-skills
 
-7 composable AI skills that turn any AI agent into a structured knowledge extraction and decision system. Works with Claude Code, VS Code Copilot, Cursor, Codex CLI, Windsurf, Cline, and 30+ other agents.
+**Protocols that distill real knowledge from LLM sessions into custom knowledge bases.**
 
-**No API key. No MCP server. No dependencies. Just markdown that teaches your agent new capabilities.**
+7 composable skills that extract structured intelligence from the AI models you already use — decision rules with numeric thresholds, validated Q&A pairs, structured predictions with evidence. The distilled knowledge persists as a searchable, quality-scored KB that downstream AI agents can consume: recommendation systems, monitoring agents, fine-tuned local models, or just a Claude Project that finally gives consistent answers.
+
+Works with Claude Code, VS Code Copilot, Cursor, Codex CLI, Windsurf, Cline, and 30+ other agents. No API key. No MCP server. No dependencies.
 
 ## Install
 
