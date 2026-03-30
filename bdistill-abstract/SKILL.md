@@ -102,7 +102,15 @@ When abstracting multiple seed rules from the same KB, cluster the structural sk
 → Deduplicate: keep the richest seed rule, merge the others as "also maps to this skeleton"
 ```
 
-Without dedup, you'll re-instantiate the same skeleton 3 times and think you found 3 insights when you found 1. Compare skeletons by keyword overlap — if >70% of content words match, they're the same pattern.
+Without dedup, you'll re-instantiate the same skeleton 3 times and think you found 3 insights when you found 1.
+
+Use the script for synonym-robust dedup:
+```bash
+python scripts/abstract_engine.py dedup-skeletons \
+  --skeletons '[{"id":"1","text":"when return exceeds cost...","seed_rule":"..."},
+                {"id":"2","text":"when yield surpasses expense...","seed_rule":"..."}]'
+```
+The script normalizes vocabulary (synonyms → canonical forms: "yield"→"benefit", "surpass"→"exceed", "expense"→"cost") before comparing. This catches duplicates that keyword overlap misses — "return exceeds cost" and "yield surpasses expense" are the same skeleton.
 
 ### Step 2: RE-INSTANTIATE — apply the structural skeleton to each target domain
 
@@ -207,17 +215,38 @@ Use bdistill-extract to build the source KB first, then run this skill on the ex
 
 ## Standalone (no dependencies)
 
-The agent performs all 6 steps in sequence:
+The agent performs all steps in sequence. The `scripts/abstract_engine.py` script handles the algorithmic parts (dedup, round-trip scoring, checkpointing, JSONL writing). The agent handles the LLM-native parts (abstraction, re-instantiation, adversarial challenge).
 
-1. Abstract each seed rule to 3 levels, select structural
-2. Deduplicate skeletons (cluster by keyword overlap > 70%)
-3. Re-instantiate in each target domain
-4. Web search for each candidate (mandatory — do not skip)
-5. Adversarial challenge on novel candidates only (3 rounds)
-6. Reverse round-trip validation on adversarial survivors
-7. Write survivors as JSONL with full metadata
+```
+Agent: Abstract seed rules to 3 levels (LLM-native)
+Script: python abstract_engine.py dedup-skeletons --skeletons '[...]'
+Script: python abstract_engine.py checkpoint --session-id X --step dedup --data '{...}'
 
-Use `scripts/extract_engine.py challenge` for adversarial rounds. Use web search for novelty grounding.
+Agent: Re-instantiate structural skeletons in target domains (LLM-native)
+Script: python abstract_engine.py checkpoint --session-id X --step re_instantiate --data '{...}'
+
+Agent: Web search for each candidate (3 query variants)
+Script: python abstract_engine.py checkpoint --session-id X --step novelty --data '{...}'
+
+Agent: Adversarial challenge on novel candidates (use extract_engine.py challenge)
+Script: python abstract_engine.py checkpoint --session-id X --step adversarial --data '{...}'
+
+Agent: Generate round-trip recovery text (LLM-native)
+Script: python abstract_engine.py round-trip-score --original "..." --recovered "..."
+Script: python abstract_engine.py checkpoint --session-id X --step round_trip --data '{...}'
+
+Script: python abstract_engine.py write-correspondence --domain X --entry '{...}'
+Script: python abstract_engine.py filter-summary --session-id X
+```
+
+**Checkpointing:** Every step saves state via `checkpoint`. If the agent dies mid-pipeline (context overflow, API timeout), resume with:
+```bash
+python abstract_engine.py resume --session-id X
+# → tells you: last_step="novelty", next_step="adversarial", 18 candidates remaining
+```
+No web search results are lost. No re-instantiations need to be regenerated.
+
+Use `scripts/extract_engine.py challenge` (from bdistill-extract) for adversarial rounds. Use web search for novelty grounding.
 
 **Critical: include unrelated target domains.** The whole point is to bypass your intuition about what's related. Most will produce garbage. You're looking for the 5% that surface a genuine structural parallel nobody wrote about.
 
