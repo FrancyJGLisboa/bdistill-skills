@@ -69,7 +69,7 @@ knowledge_entry_schema:
   domain: string
   category: string
   confidence: float        # 0.0-1.0
-  tier: enum[gold, silver, bronze]
+  tier: enum[verified, solid, approximate]
   validated: bool
   tags: string[]
   source_model: string
@@ -80,7 +80,7 @@ rules_entry_schema:
   action: string           # THEN clause
   domain: string
   confidence: float
-  tier: enum[gold, silver, bronze]
+  tier: enum[verified, solid, approximate]
   validated: bool
   tags: string[]
   source_model: string
@@ -140,9 +140,9 @@ Use this flow when bdistill MCP tools are unavailable.
    - Revise the answer to address weaknesses before scoring
 
 4. **Quality-score each entry** on a 0.0-1.0 scale:
-   - 0.9-1.0 (gold): Specific numbers, named sources, verifiable claims
-   - 0.7-0.89 (silver): Accurate mechanisms, some specificity, minor gaps
-   - 0.5-0.69 (bronze): General knowledge, no numbers, hard to verify
+   - 0.8-1.0 (verified): Specific numbers, named sources, adversarially defended
+   - 0.65-0.79 (solid): Accurate mechanisms, some specificity, minor gaps
+   - 0.5-0.64 (approximate): General knowledge, directionally right, thresholds uncertain
    - Below 0.5: Reject — do not write to file
 
 5. **Write each entry** as one JSON line to the appropriate file:
@@ -150,6 +150,10 @@ Use this flow when bdistill MCP tools are unavailable.
    - Rules: `data/rules/base/{domain}.jsonl`
 
 6. **Deduplicate**: Before appending, check if a question with the same domain and similar text already exists in the file. If so, keep the version with higher confidence.
+
+7. **Validate each JSON line before writing.** Parse the JSON string back to verify it's valid before appending to the file. Common agent errors: trailing commas, unescaped quotes in answer text, missing closing braces. If a line fails validation, fix it and retry — do not write malformed JSONL.
+
+8. **Normalize the domain name**: lowercase, hyphens only, no spaces or special characters. `"AML Compliance Brazil"` → `"aml-compliance-brazil"`. This ensures sessions always merge into the same file regardless of how the user capitalizes or spaces the name.
 
 ## How compounding works (critical)
 
@@ -204,8 +208,8 @@ domain: aml-compliance-brazil
 **Output (2 sample JSONL entries):**
 
 ```jsonl
-{"conditions": ["IF cash transaction exceeds BRL 50,000", "IF transaction has no apparent economic purpose", "IF customer is PEP or PEP-related"], "action": "THEN file SAR with COAF within 24 hours per BCB Circular 3978 Art. 13", "domain": "aml-compliance-brazil", "confidence": 0.92, "tier": "gold", "validated": true, "tags": ["sar", "coaf", "threshold", "pep"], "source_model": "claude-opus-4-6", "extracted_at": "2026-03-30T14:00:00Z"}
-{"conditions": ["IF wire transfer exceeds BRL 10,000", "IF originator or beneficiary information is incomplete", "IF destination is FATF grey-list jurisdiction"], "action": "THEN apply enhanced due diligence and retain records for 10 years per Lei 9613 Art. 10", "domain": "aml-compliance-brazil", "confidence": 0.87, "tier": "silver", "validated": true, "tags": ["edd", "wire-transfer", "fatf", "record-retention"], "source_model": "claude-opus-4-6", "extracted_at": "2026-03-30T14:00:00Z"}
+{"conditions": ["IF cash transaction exceeds BRL 50,000", "IF transaction has no apparent economic purpose", "IF customer is PEP or PEP-related"], "action": "THEN file SAR with COAF within 24 hours per BCB Circular 3978 Art. 13", "domain": "aml-compliance-brazil", "confidence": 0.92, "tier": "verified", "validated": true, "tags": ["sar", "coaf", "threshold", "pep"], "source_model": "claude-opus-4-6", "extracted_at": "2026-03-30T14:00:00Z"}
+{"conditions": ["IF wire transfer exceeds BRL 10,000", "IF originator or beneficiary information is incomplete", "IF destination is FATF grey-list jurisdiction"], "action": "THEN apply enhanced due diligence and retain records for 10 years per Lei 9613 Art. 10", "domain": "aml-compliance-brazil", "confidence": 0.87, "tier": "solid", "validated": true, "tags": ["edd", "wire-transfer", "fatf", "record-retention"], "source_model": "claude-opus-4-6", "extracted_at": "2026-03-30T14:00:00Z"}
 ```
 
 ## Composes with

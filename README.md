@@ -464,6 +464,18 @@ Pick your domain name once, write it down, reuse it. The agent is instructed to 
 
 Deduplication is automatic: if two sessions produce answers to the same question, the higher-quality version is kept.
 
+---
+
+### Known limitations
+
+**Standalone mode requires file I/O.** Skills that write JSONL/JSON to disk (extract, validate, export, operationalize) need an agent that can create files. Claude Code, Cursor, Codex CLI, VS Code Copilot (agent mode), Windsurf, and Cline all support this. Claude.ai (web chat), ChatGPT (without code interpreter), and mobile-only agents do not — for those platforms, install the bdistill MCP server (`pipx install bdistill`) which handles all file operations server-side.
+
+**Consistency probe is weaker in standalone mode.** The validate skill re-asks the same claim 5 times. With MCP, each probe is isolated (separate context). In standalone mode, all 5 happen in the same conversation — the model can see its previous answers and will appear more consistent than it really is. Mitigation: use sub-agent calls per rephrase if your platform supports it, or use MCP mode for validation.
+
+**Quality scores are model-relative.** A confidence of 0.85 from Claude Opus is not the same as 0.85 from GPT-4o-mini. Don't mix entries from different models in the same KB unless you re-validate with `bdistill-validate`.
+
+**Condition-to-data mapping requires agent reasoning.** When operationalizing rules against live data, the agent must map natural language conditions ("precip < 50mm during flowering") to API response fields (`precipitation_sum`). This mapping is imperfect. The skill instructs agents to skip unmappable rules rather than guess — check the `skipped` array in the decision report.
+
 ## License
 
 MIT

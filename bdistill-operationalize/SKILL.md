@@ -65,7 +65,10 @@ schema:
       threshold: float | string
       unit: string
       impact: string
-  data_source: object             # Raw or summary of fetched data
+  skipped:                         # Rules that couldn't be mapped to available data
+    - rule_id: string
+      reason: string               # "Could not map 'soil_moisture' to available fields"
+  data_source: object              # Raw or summary of fetched data
 ```
 
 ## The chain
@@ -87,10 +90,24 @@ bdistill-extract  -->  bdistill-export (format=harness-json)  -->  bdistill-oper
    - `csv`: Read local CSV file into records
    - `json-url`: HTTP GET any JSON endpoint, parse response
    - `custom`: User provides data inline via the context object
-3. **Check each rule**: Parse the conditions text and match against available data fields using keyword matching.
-4. **If conditions are met** -> rule triggered -> add to report with current value, threshold, and impact.
-5. **Write decision report** JSON to `data/reports/{domain}-{YYYY-MM-DD}.json`.
-6. **Print summary**: "X of Y rules triggered".
+3. **Map conditions to data fields.** This is the hard step. Rule conditions are natural language (`"cumulative_precip < 50mm during flowering"`), but API responses have structured fields (`"precipitation_sum": [1.2, 0.0, 3.4, ...]`). The agent must build a mapping:
+
+   **Mapping strategy:**
+   - For each rule, identify the **metric** (what to measure), **operator** (< > = !=), **threshold** (the number), and **unit**
+   - Match the metric to an available data field by keyword similarity:
+     - "precip" / "precipitation" / "rainfall" → `precipitation_sum`
+     - "temp" / "temperature" / "Tmax" → `temperature_2m_max`
+     - "spread" / "10Y-2Y" → compute from multiple FRED series
+     - "price" / "close" → `regularMarketPrice` (Yahoo Finance)
+   - If a condition references a **derived metric** (e.g., "cumulative_30d", "consecutive_dry_days"), compute it from raw data before checking
+   - If a condition **cannot be mapped** to any available data field, skip it and log: `"SKIPPED: rule {id} — could not map '{metric}' to available fields: {list of fields}"`
+
+   **Do not guess.** If the mapping is ambiguous, skip the rule rather than check against the wrong field. A false "not triggered" is worse than an honest "could not check."
+
+4. **Check each mapped rule**: Compare current value against threshold using the parsed operator.
+5. **If conditions are met** → rule triggered → add to report with current value, threshold, and impact.
+6. **Write decision report** JSON to `data/reports/{domain}-{YYYY-MM-DD}.json`. Include a `skipped` array alongside `triggered` for rules that couldn't be mapped.
+7. **Print summary**: "X of Y rules triggered, Z skipped (unmappable conditions)".
 
 ## Domain examples
 

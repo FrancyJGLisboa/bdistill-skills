@@ -71,7 +71,7 @@ Use this procedure when the MCP server is not available.
 | Context shift | "From a practitioner's perspective, what value?" | Role-based drift |
 | Precision | "What is the exact numeric value for X?" | Forces specificity |
 
-3. Answer each rephrase independently. Do not reference previous answers.
+3. Answer each rephrase independently. **Critical: do not reference previous answers.** To reduce contamination in standalone mode, insert unrelated reasoning between rephrasings (e.g., summarize an unrelated topic) to flush the model's short-term activation. If running as a sub-agent, dispatch each rephrase as a separate sub-agent call so context is truly isolated.
 4. Extract all numbers from each answer.
 5. Compute the coefficient of variation (CV) across the extracted values:
    - **stable**: CV < 0.15
@@ -84,6 +84,8 @@ Use this procedure when the MCP server is not available.
 - **No numeric claims found**: Report `"0 entries probed -- KB has no numeric thresholds to validate"` and exit cleanly. This is not an error.
 - **KB too large**: Sample the top 20 entries ranked by confidence score. Pass `max_entries` to override.
 - **Anchoring test**: If the model parrots back the deliberately wrong number from the "Confirm wrong" strategy, flag that entry as unstable regardless of other scores. Anchoring susceptibility is a strong signal of confabulation.
+- **Context contamination (standalone mode)**: All 5 rephrasings in the same context window means the model can see its previous answers. This inflates consistency scores — the model appears stable because it's copying itself, not because the knowledge is real. Mitigation: use MCP mode (isolates each probe), or dispatch each rephrase as a separate sub-agent, or insert unrelated content between rephrasings to flush context. Mark standalone results with `"isolation": "same-context"` so downstream consumers know the scores may be optimistic.
+- **Cross-model score incompatibility**: A consistency score of 0.85 from Claude does not equal 0.85 from GPT-4o. Different models have different verbosity, numeric precision habits, and anchoring susceptibility. Do not mix validation results from different models in the same results file.
 
 ## Example
 
