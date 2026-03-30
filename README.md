@@ -8,6 +8,53 @@ Your agents need niche domain knowledge to be actually useful — the thresholds
 
 Works with Claude Code, VS Code Copilot, Cursor, Codex CLI, Windsurf, Cline, and 30+ other agents. No API key. No MCP server. No dependencies.
 
+## How it works
+
+A knowledge worker extracts their niche expertise into a KB. An AI agent cross-checks that KB against current data. The result is a recommendation system built from real domain intelligence — no coding required.
+
+```
+YOU (the expert)                    YOUR AI AGENT (the operator)
+
+"Extract rules about marine         Generates 40 targeted questions
+ cargo insurance classification"    Answers each with specific thresholds
+         │                          Challenges its own claims
+         │                          Scores quality, flags hallucinations
+         ▼
+  ┌─────────────────┐
+  │  KNOWLEDGE BASE  │  ◄── 35 validated IF-THEN rules
+  │  marine-cargo.jsonl │     with confidence scores
+  └────────┬────────┘
+           │
+     export as JSON
+           │
+           ▼
+  ┌─────────────────┐    ┌──────────────────┐
+  │  AGENT reads     │◄──│  LIVE DATA        │
+  │  your rules      │    │  (API, CSV, feed) │
+  └────────┬────────┘    └──────────────────┘
+           │
+     checks each rule
+     against current data
+           │
+           ▼
+  ┌─────────────────────────────────┐
+  │  RECOMMENDATION                  │
+  │                                  │
+  │  "3 of 35 rules triggered:      │
+  │   - Hull age 23y > 20y limit     │
+  │   - Route passes piracy zone     │
+  │   - Cargo value exceeds $2M      │
+  │                                  │
+  │   Recommendation: REFER to       │
+  │   senior underwriter.            │
+  │   Confidence: 0.89 (verified)"   │
+  └─────────────────────────────────┘
+```
+
+**The knowledge worker provides the expertise. The agent provides the automation. The KB is the bridge.**
+
+This works for any domain: compliance analysts extracting AML thresholds, traders extracting basis risk rules, clinical researchers extracting trial criteria, insurance underwriters extracting classification rules. You extract once, validate, and your agents use it forever — improving the rules when reality proves them wrong.
+
 ## Install
 
 ```bash
