@@ -118,52 +118,69 @@ Defend honestly. If the original answer was wrong or vague, correct it. Correcte
 
 ## Standalone (no dependencies)
 
-Use this flow when bdistill MCP tools are unavailable.
+Use this flow when bdistill MCP tools are unavailable. The skill includes `scripts/extract_engine.py` — a zero-dependency Python script that handles question generation, adversarial challenges, quality scoring, and JSONL writing with the same rigor as the MCP server.
 
-1. **Generate questions** (30-50 per session). Mix these question types from the seed/custom terms:
-   - **Threshold**: "At what level does X trigger Y?"
-   - **Mechanism**: "How does X work step by step?"
-   - **Precedent**: "What happened when X occurred in [year/context]?"
-   - **Edge case**: "What breaks when X is combined with Y?"
-   - **Regulation**: "What does [law/standard] require for X?"
-   - **Quantitative**: "What is the typical range for X?"
+### The extraction loop (agent drives, script assists)
 
-2. **Answer each question** with detailed domain knowledge:
-   - Minimum 100 words per answer
-   - Include specific numbers, named entities, dates where possible
-   - Cite regulations, standards, or data sources by name
+```
+For each seed term:
+  1. Agent calls:  python extract_engine.py generate-questions --terms "term1" "term2" --mode rules
+     → Returns JSON array of targeted questions
 
-3. **Adversarial self-challenge** (on by default — this is what separates extraction from prompting):
+  2. For each question, agent answers with detailed domain knowledge (100+ words)
 
-   After EACH answer, run 3 challenges before moving to the next question:
+  3. Agent calls:  python extract_engine.py challenge --answer "the answer text"
+     → Returns 3 adversarial challenges (evidence, edge_case, contradiction)
 
-   **Challenge 1 — EVIDENCE**: "What specific evidence supports this? Cite a regulation number, dataset, study, or named source. If you cannot cite evidence, lower the confidence score."
+  4. Agent answers each challenge — defending, correcting, or deepening
 
-   **Challenge 2 — EDGE CASE**: "What's an exception or boundary condition where this breaks? What about [specific scenario that tests the limits]?" Revise the answer to include the exception.
+  5. Agent calls:  python extract_engine.py score --answer "original" --challenge-responses "resp1" "resp2" "resp3"
+     → Returns {confidence: 0.87, tier: "verified", self_corrected: true, ...}
 
-   **Challenge 3 — CONTRADICTION CHECK**: "Does this conflict with anything else in this KB? If you said X earlier but now say Y, reconcile or correct." (In standalone mode, re-read the JSONL file to check for conflicts with previously written entries.)
+  6. Agent calls:  python extract_engine.py write-entry --domain "aml-compliance-brazil" --mode rules --entry '{...}'
+     → Writes to JSONL with deduplication, returns {action: "added", total_entries: 42}
+```
 
-   After all 3 challenges, revise the original answer to incorporate corrections, exceptions, and evidence. The revised answer — not the original — is what gets scored and written to the KB.
+### What the script handles (so the agent doesn't have to)
 
-   **Why this matters:** Without adversarial challenges, the model gives its first-pass answer — often vague, sometimes hallucinated, missing edge cases. After challenges, the same model produces entries with cited evidence, acknowledged exceptions, and corrected thresholds. Entries that survive 3 challenges earn the "verified" tier. Entries that were corrected during challenges are tagged `self-corrected` — which is actually a quality signal (the model knew enough to fix itself).
+| Step | Without script (weak) | With script (same rigor as MCP) |
+|------|----------------------|-------------------------------|
+| Question generation | Agent invents questions (inconsistent) | Script uses 12 template types (threshold, combinatorial, temporal, exception, etc.) |
+| Adversarial challenge | Agent "self-challenges" (pulls punches) | Script extracts claims from the answer and generates targeted challenges |
+| Quality scoring | Agent self-scores (inflated) | Script scores based on objective signals: numbers cited, regulations named, self-corrections made |
+| JSONL writing | Agent writes JSON (often malformed) | Script validates JSON, normalizes domain name, deduplicates by content hash |
 
-   **Cross-model adversarial:** For even stronger validation, extract the initial answer from Model A, then run the 3 challenges using Model B. Model B has no loyalty to Model A's claims and will challenge more aggressively. Tag these entries `cross-model-challenged`.
+### Adversarial challenge detail
 
-4. **Quality-score each entry** on a 0.0-1.0 scale:
-   - 0.8-1.0 (verified): Specific numbers, named sources, adversarially defended
-   - 0.65-0.79 (solid): Accurate mechanisms, some specificity, minor gaps
-   - 0.5-0.64 (approximate): General knowledge, directionally right, thresholds uncertain
-   - Below 0.5: Reject — do not write to file
+The script's `challenge` command analyzes the answer and generates 3 challenges:
 
-5. **Write each entry** as one JSON line to the appropriate file:
-   - Knowledge: `data/knowledge/base/{domain}.jsonl`
-   - Rules: `data/rules/base/{domain}.jsonl`
+**EVIDENCE challenge**: Extracts a specific claim (e.g., a number or threshold) and asks "What regulation, study, or data source supports this?" Forces the agent to cite evidence or lower confidence.
 
-6. **Deduplicate**: Before appending, check if a question with the same domain and similar text already exists in the file. If so, keep the version with higher confidence.
+**EDGE CASE challenge**: Asks "In which specific contexts does this NOT apply?" Forces the agent to identify exceptions and boundary conditions.
 
-7. **Validate each JSON line before writing.** Parse the JSON string back to verify it's valid before appending to the file. Common agent errors: trailing commas, unescaped quotes in answer text, missing closing braces. If a line fails validation, fix it and retry — do not write malformed JSONL.
+**CONTRADICTION challenge**: Asks "What are the known limitations of this claim? What competing views exist?" Forces the agent to acknowledge caveats.
 
-8. **Normalize the domain name**: lowercase, hyphens only, no spaces or special characters. `"AML Compliance Brazil"` → `"aml-compliance-brazil"`. This ensures sessions always merge into the same file regardless of how the user capitalizes or spaces the name.
+The agent answers all 3 challenges. The `score` command then evaluates the combined original + challenge responses. Entries where the agent self-corrected, cited evidence, and acknowledged limitations score highest ("verified" tier). Entries where the agent couldn't defend the claim score lowest.
+
+### Cross-model adversarial (strongest validation)
+
+For maximum rigor, use two models:
+1. Model A answers the question
+2. Run `extract_engine.py challenge` on Model A's answer
+3. Model B answers the challenges (no loyalty to Model A's claims)
+4. Score based on Model B's challenges of Model A's answers
+5. Tag entries `cross-model-challenged`
+
+This is strictly stronger than self-challenge because Model B has no incentive to be consistent with Model A.
+
+### Quality tiers
+
+| Score | Tier | Meaning |
+|-------|------|---------|
+| 0.8-1.0 | verified | Specific numbers, named sources, adversarially defended |
+| 0.65-0.79 | solid | Accurate mechanisms, some specificity, minor gaps |
+| 0.5-0.64 | approximate | Directionally right, thresholds uncertain |
+| Below 0.5 | rejected | Not written to KB |
 
 ## How compounding works (critical)
 
