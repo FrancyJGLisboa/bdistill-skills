@@ -13,6 +13,7 @@ This repository contains 7 composable AI skills for structured knowledge extract
 | KB export (prompt, JSON, Excel) | `bdistill-export/` |
 | Rules vs live data monitoring | `bdistill-operationalize/` |
 | Behavioral self-probe | `bdistill-xray/` |
+| Cross-domain rule transfer | `bdistill-abstract/` |
 
 ## Composability
 

@@ -170,6 +170,7 @@ pipx install bdistill    # optional — every skill works without it
 | **bdistill-export** | Export KB to Claude/Cursor/Copilot/Excel/JSONL | "export as Claude Project prompt" |
 | **bdistill-operationalize** | Contrast rules against live API data | "check current weather against yield rules" |
 | **bdistill-xray** | Probe AI model behavioral patterns | "x-ray your own behavior" |
+| **bdistill-abstract** | Abstract rules from one domain, re-instantiate in others, find non-obvious structural correspondences | "cross-domain", "what pattern in X applies to Y", "abstract this rule" |
 
 ## How they chain
 
@@ -177,9 +178,10 @@ Skills are composable — each skill's output is the next skill's input.
 
 ```
 bdistill-discover --> bdistill-extract --> bdistill-validate --> bdistill-export --> bdistill-operationalize
-                            |
-                            v
-                      bdistill-predict
+                            |                                        |
+                            v                                        v
+                      bdistill-predict                         bdistill-abstract
+                                                              (cross-domain transfer)
 ```
 
 The shared data format is JSONL — one line per knowledge entry or rule. Every skill reads and writes the same format, so an agent can chain them without glue code.

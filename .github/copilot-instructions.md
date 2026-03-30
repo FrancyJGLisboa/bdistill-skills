@@ -15,6 +15,7 @@ When the user asks you to do any of the following, follow the corresponding SKIL
 | "export", "system prompt", "training data" | `bdistill-export/SKILL.md` | Export KB as prompt, JSON, Python, Excel, or JSONL |
 | "operationalize", "monitor", "check against live data" | `bdistill-operationalize/SKILL.md` | Contrast rules against live API data |
 | "x-ray", "probe behavior", "behavioral analysis" | `bdistill-xray/SKILL.md` | Probe your own behavioral patterns |
+| "cross-domain", "abstract this rule", "what pattern in X applies to Y" | `bdistill-abstract/SKILL.md` | Abstract rules, re-instantiate in other domains, find structural correspondences |
 
 ## How extraction works
 
