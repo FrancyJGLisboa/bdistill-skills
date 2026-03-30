@@ -151,10 +151,43 @@ Use this flow when bdistill MCP tools are unavailable.
 
 6. **Deduplicate**: Before appending, check if a question with the same domain and similar text already exists in the file. If so, keep the version with higher confidence.
 
+## How compounding works (critical)
+
+**All sessions with the same domain name merge into the same file.** This is how knowledge compounds — not by creating new files, but by appending to the existing one.
+
+```
+Session 1:  domain="aml-compliance-brazil", custom_terms=["BCB 3978", "SAR thresholds"]
+            → 30 entries written to data/rules/base/aml-compliance-brazil.jsonl
+
+Session 2:  domain="aml-compliance-brazil", custom_terms=["PEP screening", "beneficial ownership"]
+            → 25 MORE entries merged into the SAME aml-compliance-brazil.jsonl (now 55)
+
+Session 3:  domain="aml-compliance-brazil", custom_terms=["crypto AML", "travel rule"]
+            → 20 MORE entries merged (now 75, deduplicated)
+```
+
+**The domain name is the key.** Different terms, different sessions, different days — as long as the domain name is the same, everything compounds into one KB.
+
+**The footgun:** If you accidentally use a different domain name, you split your KB:
+
+```
+BAD:
+  Session 1: domain="aml-compliance"        → aml-compliance.jsonl (30 entries)
+  Session 2: domain="aml-brazil"            → aml-brazil.jsonl (25 entries)  ← SPLIT!
+  Session 3: domain="compliance-aml-brazil"  → compliance-aml-brazil.jsonl   ← SPLIT AGAIN!
+
+GOOD:
+  Session 1: domain="aml-compliance-brazil"  → aml-compliance-brazil.jsonl (30 entries)
+  Session 2: domain="aml-compliance-brazil"  → same file (now 55 entries)
+  Session 3: domain="aml-compliance-brazil"  → same file (now 75 entries, deduplicated)
+```
+
+**Agent behavior:** When starting a new extraction session, ALWAYS check if the user has an existing KB for a similar domain. If `data/knowledge/base/` or `data/rules/base/` contains a file with a similar name, suggest reusing that domain name instead of creating a new one. Ask: "You have an existing KB called 'aml-compliance-brazil' with 55 entries. Should I add to that, or create a separate KB?"
+
 ## Edge cases
 
 - **Prefer custom_terms over preset domains.** "BCB Circular 3978 AML requirements" extracts better than "finance." Encode geography, regulations, and numeric anchors directly in the terms. See [references/domain-scoping-strategy.md](references/domain-scoping-strategy.md).
-- **One domain per niche.** Use "aml-compliance-brazil" not "compliance." The export_harness filters by domain name only, and deduplication collides across broad domains.
+- **One domain per niche.** Use "aml-compliance-brazil" not "compliance." The export filters by domain name only, and deduplication collides across broad domains.
 - **Quality drops below 0.5 average**: Stop extraction and suggest narrower custom_terms. Broad domains produce vague answers.
 - **Model says "I don't know"**: Skip the question. Do not fabricate an answer to fill the entry count.
 - **Conflicting entries**: When two entries contradict, keep both but tag the newer one with `supersedes: {entry_id}` so downstream consumers can resolve.

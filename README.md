@@ -436,6 +436,34 @@ Yes. And a recipe is just text on paper. The value isn't the paper — it's that
 
 A single prompt says "tell me about AML." These skills say "generate 30 targeted questions from these seed terms, answer each with specific thresholds, challenge every claim, score quality, write structured output, validate consistency, export in 6 formats." That's the difference.
 
+---
+
+### "Do I need to be careful to use the same KB name across sessions so extractions compound into one validated KB?"
+
+**Yes — the domain name is the key.** All sessions with the same domain name merge into the same file. Different terms, different days, different sessions — as long as the domain name matches, everything compounds.
+
+```
+Session 1:  domain="aml-compliance-brazil", terms=["BCB 3978", "SAR thresholds"]
+            → 30 entries in aml-compliance-brazil.jsonl
+
+Session 2:  domain="aml-compliance-brazil", terms=["PEP screening", "beneficial ownership"]
+            → 25 MORE entries merged into the SAME file (now 55, deduplicated)
+
+Session 3:  domain="aml-compliance-brazil", terms=["crypto AML", "travel rule"]
+            → 20 MORE entries merged (now 75)
+```
+
+**The footgun to avoid:** using slightly different names for the same domain.
+
+```
+BAD:   "aml-compliance" → "aml-brazil" → "compliance-aml-brazil"  (3 separate files!)
+GOOD:  "aml-compliance-brazil" → "aml-compliance-brazil" → "aml-compliance-brazil"  (1 compounding file)
+```
+
+Pick your domain name once, write it down, reuse it. The agent is instructed to check for existing KBs before creating a new one — if you already have `aml-compliance-brazil.jsonl`, it will ask "Should I add to your existing KB?" instead of creating a new file.
+
+Deduplication is automatic: if two sessions produce answers to the same question, the higher-quality version is kept.
+
 ## License
 
 MIT
