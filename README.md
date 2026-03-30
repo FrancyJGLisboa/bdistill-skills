@@ -115,15 +115,45 @@ operationalize                         operationalize                       oper
 
 ## Install
 
+### Option 1: npx skills (if you have Node.js)
+
 ```bash
-# All 7 skills
+# All 7 skills — auto-detects your AI tools and installs to the right directories
 npx skills add FrancyJGLisboa/bdistill-skills
 
 # Just one skill
 npx skills add FrancyJGLisboa/bdistill-skills --skill bdistill-extract
 ```
 
-For full power (session management, quality scoring, compounding KB), also install the MCP server:
+### Option 2: Manual install (any platform, no Node.js needed)
+
+```bash
+# Clone the repo into your project
+git clone https://github.com/FrancyJGLisboa/bdistill-skills.git .bdistill-skills
+
+# Or just download the skills you need — they're markdown files
+```
+
+Then point your AI tool to the skills:
+
+**VS Code + GitHub Copilot:**
+Copy `.github/copilot-instructions.md` from this repo to your project's `.github/` directory. Copilot reads it automatically. For agent mode with terminal access, Copilot can also run `scripts/extract_engine.py`.
+
+**Cursor:**
+Copy `.cursor/rules/bdistill.mdc` to your project's `.cursor/rules/` directory. Cursor reads `.mdc` files automatically.
+
+**Claude Code:**
+Skills are auto-discovered from the `skills/` directory. Clone this repo inside your project or symlink it.
+
+**Codex CLI / any AGENTS.md-compatible tool:**
+Copy `AGENTS.md` from this repo to your project root. The agent reads it automatically.
+
+**Any other AI tool:**
+Open the SKILL.md file for the skill you want and paste its content into your tool's system prompt or custom instructions. The instructions work in plain text — no special format required.
+
+### Optional: MCP server (full power)
+
+For session management, automatic quality scoring, compounding KB with deduplication, and HTML reports:
 
 ```bash
 pipx install bdistill    # optional — every skill works without it

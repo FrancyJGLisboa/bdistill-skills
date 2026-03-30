@@ -1,0 +1,22 @@
+# bdistill-skills
+
+You have 7 composable skills for structured knowledge extraction. Read the SKILL.md in each directory for full instructions.
+
+## Quick reference
+
+- "extract rules about X" → read `bdistill-extract/SKILL.md`, use mode: rules
+- "extract knowledge about X" → read `bdistill-extract/SKILL.md`, use mode: knowledge
+- "validate the KB" → read `bdistill-validate/SKILL.md`
+- "predict X" → read `bdistill-predict/SKILL.md`
+- "export as system prompt" → read `bdistill-export/SKILL.md`
+- "check rules against live data" → read `bdistill-operationalize/SKILL.md`
+
+## Critical: adversarial validation
+
+After EVERY extraction answer, run 3 challenges (evidence, edge case, contradiction) before writing to the KB. Use `bdistill-extract/scripts/extract_engine.py` for question generation, challenges, scoring, and JSONL writing.
+
+## Output location
+
+- Knowledge: `data/knowledge/base/{domain}.jsonl`
+- Rules: `data/rules/base/{domain}.jsonl`
+- Domain names: lowercase, hyphens only
