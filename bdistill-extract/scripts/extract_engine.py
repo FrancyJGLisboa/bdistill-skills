@@ -109,32 +109,107 @@ def extract_claims(answer: str) -> list[str]:
     return claims[:5]
 
 
-def generate_challenges(answer: str, num: int = 3) -> list[dict]:
-    """Generate adversarial challenges for an answer."""
+def generate_challenges(
+    answer: str,
+    num: int = 3,
+    depth: str = "standard",
+    existing_kb_path: str | None = None,
+) -> list[dict]:
+    """Generate adversarial challenges for an answer.
+
+    Depth levels:
+      - "standard" (default): 3 challenges targeting the strongest claim
+      - "thorough": one challenge per extracted claim (up to 5 claims × 1 each)
+      - "deep": every claim gets evidence + edge_case + contradiction (up to 5 × 3 = 15)
+
+    If existing_kb_path is provided, also generates CONTRADICTION challenges
+    by checking for conflicting entries already in the KB.
+    """
     claims = extract_claims(answer)
     if not claims:
         claims = [answer[:200]]
 
-    challenges = []
-    claim = random.choice(claims)
-
-    # Always include one of each type
-    templates = [
+    challenge_types = [
         ("evidence", EVIDENCE_CHALLENGES),
         ("edge_case", EDGE_CASE_CHALLENGES),
         ("contradiction", CONTRADICTION_CHALLENGES),
     ]
 
-    for challenge_type, tmpls in templates[:num]:
-        t = random.choice(tmpls)
-        text = t.format(claim=claim) if "{claim}" in t else t
-        challenges.append({
-            "type": challenge_type,
-            "text": text,
-            "target_claim": claim,
-        })
+    challenges = []
+
+    if depth == "standard":
+        # Original behavior: 3 challenges on the strongest claim (most specific)
+        claim = max(claims, key=lambda c: len(re.findall(r'\d', c)), default=claims[0])
+        for ctype, tmpls in challenge_types[:num]:
+            t = random.choice(tmpls)
+            text = t.format(claim=claim) if "{claim}" in t else t
+            challenges.append({"type": ctype, "text": text, "target_claim": claim})
+
+    elif depth == "thorough":
+        # One challenge per claim, rotating types
+        for i, claim in enumerate(claims):
+            ctype, tmpls = challenge_types[i % len(challenge_types)]
+            t = random.choice(tmpls)
+            text = t.format(claim=claim) if "{claim}" in t else t
+            challenges.append({"type": ctype, "text": text, "target_claim": claim})
+
+    elif depth == "deep":
+        # Every claim gets all 3 challenge types
+        for claim in claims:
+            for ctype, tmpls in challenge_types:
+                t = random.choice(tmpls)
+                text = t.format(claim=claim) if "{claim}" in t else t
+                challenges.append({"type": ctype, "text": text, "target_claim": claim})
+
+    # Cross-KB contradiction check: compare against existing entries
+    if existing_kb_path:
+        kb_contradictions = _check_kb_contradictions(answer, existing_kb_path)
+        challenges.extend(kb_contradictions)
 
     return challenges
+
+
+def _check_kb_contradictions(answer: str, kb_path: str) -> list[dict]:
+    """Check if the answer contradicts any existing KB entry."""
+    path = Path(kb_path)
+    if not path.exists():
+        return []
+
+    answer_claims = extract_claims(answer)
+    if not answer_claims:
+        return []
+
+    contradictions = []
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                existing_text = entry.get("answer", entry.get("action", ""))
+                existing_claims = extract_claims(existing_text)
+
+                for new_claim in answer_claims:
+                    for old_claim in existing_claims:
+                        # Check for numeric disagreement on same topic
+                        new_nums = set(re.findall(r'\d+(?:\.\d+)?', new_claim))
+                        old_nums = set(re.findall(r'\d+(?:\.\d+)?', old_claim))
+                        # Same topic (>40% word overlap) but different numbers
+                        new_words = set(new_claim.lower().split())
+                        old_words = set(old_claim.lower().split())
+                        overlap = len(new_words & old_words) / max(len(new_words | old_words), 1)
+                        if overlap > 0.4 and new_nums != old_nums and new_nums and old_nums:
+                            contradictions.append({
+                                "type": "kb_contradiction",
+                                "text": f"Your answer says '{new_claim.strip()}' but an existing KB entry says '{old_claim.strip()}'. The numbers differ ({new_nums} vs {old_nums}). Which is correct? Reconcile with evidence.",
+                                "target_claim": new_claim.strip(),
+                                "existing_entry_id": entry.get("_hash", "unknown"),
+                            })
+    except (json.JSONDecodeError, OSError):
+        pass
+
+    return contradictions[:3]  # Cap at 3 KB contradictions
 
 
 # ── Quality scoring ────────────────────────────────────────────
@@ -346,6 +421,9 @@ def main():
     ch = sub.add_parser("challenge")
     ch.add_argument("--answer", required=True)
     ch.add_argument("--num", type=int, default=3)
+    ch.add_argument("--depth", choices=["standard", "thorough", "deep"], default="standard",
+                    help="standard=3 on best claim, thorough=1 per claim, deep=3 per claim")
+    ch.add_argument("--kb-path", default=None, help="Path to existing KB for contradiction detection")
     ch.add_argument("--session-id", default=None, help="Session ID for checkpoint tracking")
 
     # score
@@ -378,7 +456,11 @@ def main():
         json.dump(questions, sys.stdout, indent=2)
 
     elif args.command == "challenge":
-        challenges = generate_challenges(args.answer, args.num)
+        challenges = generate_challenges(
+            args.answer, args.num,
+            depth=args.depth,
+            existing_kb_path=args.kb_path,
+        )
         json.dump(challenges, sys.stdout, indent=2)
 
     elif args.command == "score":

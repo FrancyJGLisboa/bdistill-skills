@@ -47,6 +47,7 @@ required (one of):
 optional:
   mode: enum[knowledge, rules]  # Default: knowledge
   adversarial: bool              # Default: true — challenge every answer
+  adversarial_depth: enum[standard, thorough, deep]  # Default: standard (see below)
   target: int                    # Entry count for autonomous loop (no human in the loop)
 output:
   domain: string
@@ -129,8 +130,8 @@ For each seed term:
 
   2. For each question, agent answers with detailed domain knowledge (100+ words)
 
-  3. Agent calls:  python extract_engine.py challenge --answer "the answer text"
-     → Returns 3 adversarial challenges (evidence, edge_case, contradiction)
+  3. Agent calls:  python extract_engine.py challenge --answer "the answer text" --depth thorough --kb-path data/rules/base/domain.jsonl
+     → Returns challenges: 1 per claim (thorough) or 3 per claim (deep) + KB contradiction checks
 
   4. Agent answers each challenge — defending, correcting, or deepening
 
@@ -150,17 +151,50 @@ For each seed term:
 | Quality scoring | Agent self-scores (inflated) | Script scores based on objective signals: numbers cited, regulations named, self-corrections made |
 | JSONL writing | Agent writes JSON (often malformed) | Script validates JSON, normalizes domain name, deduplicates by content hash |
 
-### Adversarial challenge detail
+### Adversarial depth levels
 
-The script's `challenge` command analyzes the answer and generates 3 challenges:
+The `--depth` flag controls how thoroughly each answer is challenged:
 
-**EVIDENCE challenge**: Extracts a specific claim (e.g., a number or threshold) and asks "What regulation, study, or data source supports this?" Forces the agent to cite evidence or lower confidence.
+| Depth | What happens | Challenges generated | When to use |
+|-------|-------------|---------------------|-------------|
+| `standard` | 3 challenges on the strongest claim (most numeric) | 3 | Quick extraction, first pass, large KB builds |
+| `thorough` | 1 challenge per extracted claim (rotates types) | 3-5 (one per claim) | Default for rules extraction — every claim examined |
+| `deep` | 3 challenges per claim (evidence + edge case + contradiction each) | 9-15 | High-stakes rules (compliance, safety, clinical) |
 
-**EDGE CASE challenge**: Asks "In which specific contexts does this NOT apply?" Forces the agent to identify exceptions and boundary conditions.
+**Example of depth difference on the same answer:**
 
-**CONTRADICTION challenge**: Asks "What are the known limitations of this claim? What competing views exist?" Forces the agent to acknowledge caveats.
+Answer: "IF transaction > R$50,000 THEN file SAR. IF cumulative > R$100,000/30d THEN EDD. IF PEP THEN enhanced monitoring."
 
-The agent answers all 3 challenges. The `score` command then evaluates the combined original + challenge responses. Entries where the agent self-corrected, cited evidence, and acknowledged limitations score highest ("verified" tier). Entries where the agent couldn't defend the claim score lowest.
+| Depth | Claims challenged | Total challenges |
+|-------|------------------|-----------------|
+| standard | Only "R$50,000" claim | 3 (evidence, edge_case, contradiction) |
+| thorough | R$50K, R$100K, PEP — one each | 3 (rotating types) |
+| deep | R$50K gets 3, R$100K gets 3, PEP gets 3 | 9 challenges |
+
+**The `--kb-path` flag adds cross-entry contradiction detection:**
+
+```bash
+python extract_engine.py challenge --answer "threshold is R$50,000" \
+  --depth thorough --kb-path data/rules/base/aml-compliance.jsonl
+```
+
+The script reads the existing KB and checks: does any previously written entry state a DIFFERENT number for a similar claim? If yes, it generates an additional KB_CONTRADICTION challenge:
+
+> "Your answer says 'threshold is R$50,000' but existing KB entry #a3f2 says 'threshold is R$10,000 for wire transfers'. The numbers differ. Which is correct and under what conditions? Reconcile with evidence."
+
+This catches the case where session 3 contradicts session 1 — without the agent needing to remember earlier sessions.
+
+### Challenge types
+
+**EVIDENCE**: Extracts a specific claim (a number or threshold) and asks "What regulation, study, or data source supports this?" Forces the agent to cite evidence or lower confidence.
+
+**EDGE CASE**: Asks "In which specific contexts does this NOT apply?" Forces the agent to identify exceptions and boundary conditions.
+
+**CONTRADICTION**: Asks "What are the known limitations of this claim? What competing views exist?" Forces the agent to acknowledge caveats.
+
+**KB_CONTRADICTION** (only when --kb-path provided): Surfaces conflicts with existing entries. The agent must reconcile — either correct the new entry, correct the old entry (by re-writing with higher confidence), or explain when each applies.
+
+The `score` command evaluates the combined original + challenge responses. Entries where the agent self-corrected, cited evidence, and acknowledged limitations score highest ("verified" tier). Entries where the agent couldn't defend the claim score lowest.
 
 ### Cross-model adversarial (strongest validation)
 
