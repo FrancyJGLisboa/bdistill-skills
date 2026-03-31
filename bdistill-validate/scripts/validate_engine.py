@@ -194,6 +194,113 @@ def consistency_score(values: list[float]) -> dict:
     }
 
 
+# -- Structural stability (beyond numeric) ---------------------------------
+
+def structural_stability(answers: list[str]) -> dict:
+    """Measure stability across multiple freeform answers to the same question.
+
+    Goes beyond numeric consistency — checks whether the structure, scope,
+    conditions, and reasoning are stable across rephrasings.
+
+    Returns per-dimension stability + overall score.
+    """
+    if len(answers) < 2:
+        return {"overall": 1.0, "note": "Need 2+ answers to compare"}
+
+    # 1. Condition stability — do IF/WHEN conditions appear consistently?
+    condition_sets = []
+    for ans in answers:
+        conditions = set()
+        for match in re.finditer(r'\b(?:if|when|where|unless|except|during|after|before)\b\s+(.{10,80}?)(?:\.|,|;|\band\b|\bthen\b)', ans.lower()):
+            # Normalize the condition
+            cond = re.sub(r'\s+', ' ', match.group(1).strip())
+            conditions.add(cond)
+        condition_sets.append(conditions)
+
+    # How many conditions appear in ALL answers vs just some?
+    if condition_sets and any(condition_sets):
+        all_conditions = set.union(*condition_sets)
+        if all_conditions:
+            always_present = set.intersection(*condition_sets) if all(condition_sets) else set()
+            condition_score = len(always_present) / len(all_conditions) if all_conditions else 1.0
+        else:
+            condition_score = 1.0
+    else:
+        condition_score = 1.0
+
+    # 2. Scope stability — do scope qualifiers stay consistent?
+    scope_markers = ["all", "every", "any", "only", "some", "most", "never", "always",
+                     "financial institutions", "banks", "fintechs", "companies",
+                     "mandatory", "optional", "recommended", "required"]
+    scope_sets = []
+    for ans in answers:
+        lower = ans.lower()
+        present = frozenset(m for m in scope_markers if m in lower)
+        scope_sets.append(present)
+
+    if scope_sets:
+        all_scopes = set.union(*scope_sets)
+        if all_scopes:
+            always_scopes = set.intersection(*scope_sets) if all(scope_sets) else set()
+            scope_score = len(always_scopes) / len(all_scopes)
+        else:
+            scope_score = 1.0
+    else:
+        scope_score = 1.0
+
+    # 3. Structure stability — does the answer have the same shape?
+    structure_features = []
+    for ans in answers:
+        features = {
+            "has_if_then": bool(re.search(r'\bif\b.*\bthen\b', ans.lower())),
+            "has_numbered_list": bool(re.search(r'^\s*\d+[\.\)]\s', ans, re.MULTILINE)),
+            "has_exception": bool(re.search(r'\b(?:except|unless|however|but)\b', ans.lower())),
+            "has_threshold": bool(re.search(r'\d+[%$]|\$\d|R\$|>\s*\d|<\s*\d', ans)),
+            "has_citation": bool(re.search(r'Art\.\s*\d+|Circular|Lei\s+\d+|Section', ans)),
+            "num_sentences": len(re.split(r'[.!?]+', ans)),
+        }
+        structure_features.append(features)
+
+    # Compare boolean features across answers
+    bool_keys = [k for k in structure_features[0] if k != "num_sentences"]
+    structure_agreements = 0
+    structure_total = 0
+    for key in bool_keys:
+        values = [f[key] for f in structure_features]
+        structure_total += 1
+        if len(set(values)) == 1:  # all agree
+            structure_agreements += 1
+
+    structure_score = structure_agreements / structure_total if structure_total > 0 else 1.0
+
+    # 4. Length stability — do answers have similar length?
+    lengths = [len(ans.split()) for ans in answers]
+    mean_len = sum(lengths) / len(lengths)
+    if mean_len > 0:
+        len_cv = (sum((l - mean_len)**2 for l in lengths) / len(lengths)) ** 0.5 / mean_len
+        length_score = max(0, 1.0 - len_cv)
+    else:
+        length_score = 1.0
+
+    # Overall
+    overall = (condition_score + scope_score + structure_score + length_score) / 4
+
+    return {
+        "condition_stability": round(condition_score, 3),
+        "scope_stability": round(scope_score, 3),
+        "structure_stability": round(structure_score, 3),
+        "length_stability": round(length_score, 3),
+        "overall": round(overall, 3),
+        "tier": "stable" if overall >= 0.80 else "moderate" if overall >= 0.60 else "unstable",
+        "details": {
+            "conditions_always_present": list(always_present) if condition_sets and any(condition_sets) and all_conditions else [],
+            "conditions_sometimes_missing": list(all_conditions - always_present) if condition_sets and any(condition_sets) and all_conditions else [],
+            "scope_consistent": list(always_scopes) if scope_sets and all_scopes else [],
+            "scope_varies": list(all_scopes - always_scopes) if scope_sets and all_scopes else [],
+        },
+    }
+
+
 # -- Pipeline checkpointing ------------------------------------------------
 
 CHECKPOINT_DIR = Path("data/validate/checkpoints")
@@ -323,6 +430,10 @@ def main():
     rs = sub.add_parser("resume")
     rs.add_argument("--session-id", required=True)
 
+    # structural-stability
+    ss = sub.add_parser("structural-stability")
+    ss.add_argument("--answers", required=True, help="JSON array of freeform answer strings to the same question")
+
     # write-results
     wr = sub.add_parser("write-results")
     wr.add_argument("--domain", required=True)
@@ -350,6 +461,11 @@ def main():
 
     elif args.command == "resume":
         result = resume_checkpoint(args.session_id)
+        json.dump(result, sys.stdout, indent=2)
+
+    elif args.command == "structural-stability":
+        answers = json.loads(args.answers)
+        result = structural_stability(answers)
         json.dump(result, sys.stdout, indent=2)
 
     elif args.command == "write-results":
