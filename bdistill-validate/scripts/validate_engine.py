@@ -135,9 +135,21 @@ def _parse_single_number(raw: str) -> float | None:
 
 
 def extract_numbers(text: str) -> list[float]:
-    """Extract all numeric values from text, normalizing currencies and suffixes."""
+    """Extract numeric values that represent thresholds/amounts, not identifiers.
+
+    Filters out: regulation numbers (Circular 3978), article numbers (Art. 12),
+    years (2024), and negated values ("not R$70,000").
+    """
+    # Pre-filter: remove regulation/article/section references
+    cleaned = re.sub(
+        r'(?:Circular|Resolution|Lei|Art|Section|RDC|BCB|COAF|Phase|Stage)\s*\.?\s*\d+',
+        '', text, flags=re.IGNORECASE
+    )
+    # Remove years (4-digit numbers that look like years 1900-2099)
+    cleaned = re.sub(r'\b(19|20)\d{2}\b', '', cleaned)
+
     results = []
-    for match in _NUMBER_PATTERN.finditer(text):
+    for match in _NUMBER_PATTERN.finditer(cleaned):
         digits_raw = match.group(1)
         suffix_raw = (match.group(2) or "").strip().lower()
 
@@ -151,6 +163,19 @@ def extract_numbers(text: str) -> list[float]:
         else:
             multiplier = _SUFFIX_MAP.get(suffix_raw, 1)
             value *= multiplier
+
+        # Skip very small numbers likely to be identifiers (< 100 without currency/suffix)
+        full_match = match.group(0)
+        has_currency = bool(re.search(r'R\$|US\$|\$|€|£|BRL|USD', full_match))
+        has_suffix = bool(suffix_raw and suffix_raw != "%")
+        if value < 100 and not has_currency and not has_suffix:
+            continue
+
+        # Check for negation: "not R$70,000", "no R$70,000", "isn't 70,000"
+        start = match.start()
+        prefix = cleaned[max(0, start - 30):start].lower()
+        if any(neg in prefix for neg in ["not ", "no ", "isn't ", "wasn't ", "neither ", "nor ", "never "]):
+            continue
 
         results.append(value)
     return results
@@ -239,9 +264,9 @@ def structural_stability(answers: list[str]) -> dict:
         scope_sets.append(present)
 
     if scope_sets:
-        all_scopes = set.union(*scope_sets)
+        all_scopes = frozenset().union(*scope_sets)
         if all_scopes:
-            always_scopes = set.intersection(*scope_sets) if all(scope_sets) else set()
+            always_scopes = frozenset.intersection(*scope_sets) if all(scope_sets) else frozenset()
             scope_score = len(always_scopes) / len(all_scopes)
         else:
             scope_score = 1.0
