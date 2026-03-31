@@ -73,7 +73,100 @@ fields:
 5. Write output as JSON to `data/discovery/{domain}-seeds.json`
 6. Suggest: "Run bdistill-extract with these terms: ..."
 
-## Detecting multi-domain causal chains
+## Detecting complex topic structures
+
+Not every query is a single domain. Three patterns to detect:
+
+### Pattern 1: Multi-variable system
+
+The user wants rules about **multiple interacting variables** within one domain — e.g., "crop stress from water balance, temperature, precipitation, and soil moisture for soybeans."
+
+**Signal words:** "variables", "factors", "combined effect", "interaction between", listing 3+ measurable quantities.
+
+These are NOT separate domains — they interact. Extract into ONE domain but structure the seed terms to cover:
+- **Individual variable thresholds**: "at what temperature does stress begin?"
+- **Variable interactions**: "what happens when BOTH high temp AND low moisture?"
+- **Compound thresholds**: "at what combination does yield loss exceed 20%?"
+- **Temporal windows**: "during which growth stage does each variable matter most?"
+
+**Output format for multi-variable systems:**
+
+```yaml
+type: multi_variable
+domain: string                    # One domain for the whole system
+variables:
+  - name: string                  # e.g., "temperature"
+    seed_terms: string[]          # Thresholds for this variable alone
+  - name: string                  # e.g., "soil_moisture"
+    seed_terms: string[]
+interaction_terms: string[]       # Compound/interaction thresholds
+temporal_terms: string[]          # Growth stage sensitivity windows
+```
+
+**Example:** "I need rules about crop stress weather variables — water balance, temperature, precipitation, soil moisture for soybeans in Mato Grosso"
+
+```json
+{
+  "type": "multi_variable",
+  "domain": "soy-mt-crop-stress",
+  "variables": [
+    {
+      "name": "temperature",
+      "seed_terms": [
+        "Mato Grosso soybean heat stress threshold Tmax during R1-R5",
+        "night temperature below which MT soybean recovery occurs",
+        "accumulated heat units (GDD) above 30C during grain fill yield impact"
+      ]
+    },
+    {
+      "name": "precipitation",
+      "seed_terms": [
+        "cumulative precipitation below which MT soybean flowering yield drops",
+        "consecutive dry days threshold during R1-R3 for rainfed soy MT",
+        "excess precipitation threshold causing waterlogging in cerrado latossolo"
+      ]
+    },
+    {
+      "name": "soil_moisture",
+      "seed_terms": [
+        "available water capacity below which soybean stress begins in cerrado",
+        "soil moisture recovery rate after drought event cerrado soil type",
+        "permanent wilting point vs temporary stress threshold for soy MT"
+      ]
+    },
+    {
+      "name": "water_balance",
+      "seed_terms": [
+        "evapotranspiration vs precipitation ratio threshold for yield impact",
+        "crop water demand by growth stage soybean tropical cerrado",
+        "VPD vapor pressure deficit above which stomatal closure reduces yield"
+      ]
+    }
+  ],
+  "interaction_terms": [
+    "compound effect high temperature AND low soil moisture on soy yield MT",
+    "multiplicative vs additive yield loss when drought heat overlap simultaneously",
+    "sequential stress: does prior water stress increase heat vulnerability?",
+    "does irrigation fully offset heat stress or only partially?"
+  ],
+  "temporal_terms": [
+    "which growth stage R1-R6 is most sensitive to each weather variable",
+    "critical window duration: how many days of stress before irreversible damage",
+    "planting date interaction: does late planting shift the stress sensitivity windows"
+  ],
+  "recommended_workflow": [
+    "1. Extract individual variable thresholds first (4 sessions, same domain)",
+    "2. Extract interaction rules (compound thresholds)",
+    "3. Extract temporal windows (growth stage sensitivity)",
+    "4. Validate ALL entries — compound thresholds are the most likely to be hallucinated",
+    "5. Export as JSON for operationalize against Open-Meteo weather data"
+  ]
+}
+```
+
+**Key:** All extractions use the SAME domain name (`soy-mt-crop-stress`) so everything compounds into one KB. The agent runs `bdistill-extract` multiple times with different custom_terms — once per variable group, once for interactions, once for temporal windows.
+
+### Pattern 2: Causal chain (cross-domain)
 
 When the user's query spans multiple domains connected by cause-and-effect, **do not flatten into one domain**. Instead, decompose into a **chain of linked extraction sessions**, each with its own domain name.
 

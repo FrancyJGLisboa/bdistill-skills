@@ -41,6 +41,22 @@ npx skills add FrancyJGLisboa/bdistill-skills          # auto-detects your AI to
 "Check rules against live data"                  # → which rules are triggered right now?
 ```
 
+**Complex topics work too.** You don't need to pre-structure your request:
+
+```
+"Extract rules about crop stress — water balance, temperature, precipitation,
+ soil moisture for soybeans in Mato Grosso"
+# → Agent detects multi-variable system, structures extraction by variable,
+#   then extracts compound interaction thresholds, then temporal windows.
+#   All in one KB, validated together.
+
+"Extract rules about price movements from Hormuz strait geopolitical tensions
+ through to nitrogen fertilizer costs"
+# → Agent detects causal chain, decomposes into linked domains:
+#   energy-geopolitics → energy-fertilizer-linkage → fertilizer-economics.
+#   Extracts upstream first, downstream second.
+```
+
 **Extract → Validate is the minimum viable workflow.** Don't skip validation — an unvalidated KB is just organized hallucinations. The scripts in `scripts/` add more rigor (adversarial depth levels, cross-KB contradiction detection, checkpointing) when you're ready.
 
 ## How it works
