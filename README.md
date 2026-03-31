@@ -189,48 +189,102 @@ operationalize                         operationalize                       oper
 
 ## Install
 
-### Option 1: npx skills (if you have Node.js)
+Pick your AI tool. Follow the steps. Takes 2 minutes.
+
+### VS Code + GitHub Copilot (Windows, Mac, or Linux)
 
 ```bash
-# All 7 skills — auto-detects your AI tools and installs to the right directories
+# 1. Open a terminal in your project folder
+
+# 2. Clone bdistill-skills into your project
+git clone https://github.com/FrancyJGLisboa/bdistill-skills.git .bdistill-skills
+
+# 3. Copy the Copilot instructions file to where Copilot reads it
+mkdir -p .github
+cp .bdistill-skills/.github/copilot-instructions.md .github/copilot-instructions.md
+
+# 4. That's it. Open VS Code, open Copilot Chat, and say:
+#    "Extract rules about [your topic]"
+```
+
+**Windows PowerShell alternative for step 2-3:**
+```powershell
+git clone https://github.com/FrancyJGLisboa/bdistill-skills.git .bdistill-skills
+New-Item -ItemType Directory -Force -Path .github
+Copy-Item .bdistill-skills\.github\copilot-instructions.md .github\copilot-instructions.md
+```
+
+**To also use the scripts** (adversarial depth, checkpointing, validation engine):
+```bash
+# Make sure Python 3.10+ is installed, then:
+python .bdistill-skills/bdistill-extract/scripts/extract_engine.py --help
+# Copilot in agent mode can run these scripts directly from the terminal
+```
+
+### Claude Code (Mac, Linux, or WSL on Windows)
+
+```bash
+# 1. Open a terminal in your project folder
+
+# 2. Clone bdistill-skills — Claude Code auto-discovers skills/ directories
+git clone https://github.com/FrancyJGLisboa/bdistill-skills.git skills
+
+# 3. That's it. Start Claude Code and say:
+#    "Extract rules about [your topic]"
+```
+
+Claude Code reads SKILL.md files from `skills/` automatically. All 8 skills are immediately available as invocable skills.
+
+### Cursor (Windows, Mac, or Linux)
+
+```bash
+# 1. Open a terminal in your project folder
+
+# 2. Clone bdistill-skills
+git clone https://github.com/FrancyJGLisboa/bdistill-skills.git .bdistill-skills
+
+# 3. Copy the Cursor rules file
+mkdir -p .cursor/rules
+cp .bdistill-skills/.cursor/rules/bdistill.mdc .cursor/rules/bdistill.mdc
+
+# 4. Open Cursor and say:
+#    "Extract rules about [your topic]"
+```
+
+### Codex CLI / GitHub Copilot CLI
+
+```bash
+# 1. Clone bdistill-skills
+git clone https://github.com/FrancyJGLisboa/bdistill-skills.git .bdistill-skills
+
+# 2. Copy AGENTS.md to your project root
+cp .bdistill-skills/AGENTS.md AGENTS.md
+
+# 3. Run Codex and say:
+#    "Extract rules about [your topic]"
+```
+
+### npx skills (auto-detect, if you have Node.js)
+
+```bash
+# Installs to all detected AI tools at once
 npx skills add FrancyJGLisboa/bdistill-skills
 
-# Just one skill
+# Or just one skill
 npx skills add FrancyJGLisboa/bdistill-skills --skill bdistill-extract
 ```
 
-### Option 2: Manual install (any platform, no Node.js needed)
+### Any other AI tool (ChatGPT, Windsurf, Cline, etc.)
 
-```bash
-# Clone the repo into your project
-git clone https://github.com/FrancyJGLisboa/bdistill-skills.git .bdistill-skills
-
-# Or just download the skills you need — they're markdown files
-```
-
-Then point your AI tool to the skills:
-
-**VS Code + GitHub Copilot:**
-Copy `.github/copilot-instructions.md` from this repo to your project's `.github/` directory. Copilot reads it automatically. For agent mode with terminal access, Copilot can also run `scripts/extract_engine.py`.
-
-**Cursor:**
-Copy `.cursor/rules/bdistill.mdc` to your project's `.cursor/rules/` directory. Cursor reads `.mdc` files automatically.
-
-**Claude Code:**
-Skills are auto-discovered from the `skills/` directory. Clone this repo inside your project or symlink it.
-
-**Codex CLI / any AGENTS.md-compatible tool:**
-Copy `AGENTS.md` from this repo to your project root. The agent reads it automatically.
-
-**Any other AI tool:**
-Open the SKILL.md file for the skill you want and paste its content into your tool's system prompt or custom instructions. The instructions work in plain text — no special format required.
+Open `bdistill-extract/SKILL.md` from this repo and paste its content into your tool's system prompt or custom instructions. The instructions are plain markdown — they work anywhere.
 
 ### Optional: MCP server (full power)
 
-For session management, automatic quality scoring, compounding KB with deduplication, and HTML reports:
+Not required. Every skill works without it. But if you want session management, automatic quality scoring, compounding KB with deduplication, and HTML reports:
 
 ```bash
-pipx install bdistill    # optional — every skill works without it
+pip install bdistill        # or: pipx install bdistill
+bdistill setup              # auto-detects and configures your AI tools
 ```
 
 ## The Skills
