@@ -195,17 +195,57 @@ def _find_field(conditions: str, data_fields: list[str]) -> str | None:
     return None
 
 
-def check_rule(rule: dict, data: dict | list) -> dict | None:
-    """Check a single rule against fetched data.
+def _check_categorical(sub_condition: str, row: dict, data_fields: list[str]) -> bool | None:
+    """Check a categorical sub-condition against a data row.
 
-    Returns a triggered-report dict if the rule fires, None otherwise.
-    Handles both structured conditions (field > 123) and natural language
-    ("single cash transaction exceeds BRL 50,000").
+    Returns True if matched, False if not matched, None if can't resolve.
+    Handles: "customer is PEP", "transaction_type is cash", "is_pep == true"
+    """
+    sub_lower = sub_condition.lower().strip()
+
+    # Pattern: "is PEP" / "is classified as PEP" / "is_pep"
+    # Try to find a boolean field that matches
+    for field in data_fields:
+        field_lower = field.lower()
+
+        # Direct boolean check: "is_pep" in condition, field "is_pep" exists
+        if field_lower in sub_lower:
+            val = str(row.get(field, "")).lower()
+            # Check for negative conditions: "is NOT PEP"
+            neg_before = sub_lower[:sub_lower.find(field_lower)]
+            if any(neg in neg_before for neg in ["not ", "no ", "isn't ", "non-"]):
+                return val in ("false", "0", "no", "")
+            return val in ("true", "1", "yes")
+
+    # Pattern: field keywords match
+    for keyword, candidate_fields in _FIELD_KEYWORDS.items():
+        if keyword in sub_lower:
+            for cf in candidate_fields:
+                if cf in data_fields:
+                    val = str(row.get(cf, "")).lower()
+                    # If the sub-condition mentions a specific value, check for it
+                    # e.g., "transaction_type is cash" → check if field == "cash"
+                    for val_word in ["cash", "wire", "true", "false", "yes", "no"]:
+                        if val_word in sub_lower:
+                            return val == val_word
+                    # Default: boolean check
+                    return val in ("true", "1", "yes")
+
+    return None  # Can't resolve this sub-condition
+
+
+def check_rule(rule: dict, data: dict | list) -> dict | None:
+    """Check a rule against fetched data, including compound AND conditions.
+
+    Returns a triggered-report dict if ALL resolvable sub-conditions pass.
+    Sub-conditions that can't be resolved are marked as "unchecked" — the
+    rule only triggers if at least one numeric threshold passes AND no
+    resolvable categorical condition fails.
     """
     conditions = rule.get("conditions", "") or rule.get("text", "") or rule.get("answer", "")
-    threshold, operator = _parse_threshold(conditions)
-    if threshold is None:
-        return None
+
+    # Split compound conditions on AND
+    sub_conditions = re.split(r'\s+AND\s+', conditions, flags=re.IGNORECASE)
 
     # Get available data fields
     if isinstance(data, dict):
@@ -215,36 +255,84 @@ def check_rule(rule: dict, data: dict | list) -> dict | None:
     else:
         return None
 
-    field = _find_field(conditions, data_fields)
-    if field is None:
+    # For each sub-condition, determine type and prepare check
+    numeric_subs = []
+    categorical_subs = []
+
+    for sub in sub_conditions:
+        thresh, op = _parse_threshold(sub)
+        if thresh is not None:
+            field = _find_field(sub, data_fields)
+            numeric_subs.append({"sub": sub, "threshold": thresh, "operator": op, "field": field})
+        else:
+            categorical_subs.append(sub)
+
+    # Must have at least one numeric threshold to check
+    if not numeric_subs:
         return None
 
-    # Get current value(s)
-    if isinstance(data, dict):
-        current = data.get(field)
-    elif isinstance(data, list):
-        # For CSV with multiple rows: check each row, trigger on any
-        for row in data:
-            val = row.get(field)
+    # Must have at least one numeric sub with a resolvable field
+    if not any(ns["field"] for ns in numeric_subs):
+        return None
+
+    # Check against data rows
+    rows = data if isinstance(data, list) else [data]
+
+    for row in rows:
+        # Check ALL numeric sub-conditions
+        numeric_pass = True
+        triggered_details = {}
+
+        for ns in numeric_subs:
+            if ns["field"] is None:
+                continue  # skip unresolvable numeric subs
+
+            val = row.get(ns["field"])
             try:
                 val = float(val)
             except (ValueError, TypeError):
-                continue
-            ops = {">": val > threshold, "<": val < threshold,
-                   ">=": val >= threshold, "<=": val <= threshold,
-                   "==": val == threshold, "!=": val != threshold}
-            if ops.get(operator, False):
-                return {
-                    "rule_id": rule.get("id", rule.get("_hash", "unknown")),
-                    "confidence": rule.get("confidence", 0),
-                    "conditions": conditions[:200],
-                    "current_value": val,
-                    "threshold": threshold,
-                    "field": field,
-                    "operator": operator,
-                    "unit": "",
-                    "impact": rule.get("action", ""),
-                    "matched_row": row,
+                numeric_pass = False
+                break
+
+            ops = {">": val > ns["threshold"], "<": val < ns["threshold"],
+                   ">=": val >= ns["threshold"], "<=": val <= ns["threshold"],
+                   "==": val == ns["threshold"], "!=": val != ns["threshold"]}
+
+            if not ops.get(ns["operator"], False):
+                numeric_pass = False
+                break
+
+            triggered_details = {"current_value": val, "threshold": ns["threshold"],
+                                 "field": ns["field"], "operator": ns["operator"]}
+
+        if not numeric_pass:
+            continue
+
+        # Check ALL categorical sub-conditions
+        categorical_pass = True
+        unchecked_conditions = []
+
+        for cat_sub in categorical_subs:
+            result = _check_categorical(cat_sub, row, data_fields)
+            if result is None:
+                unchecked_conditions.append(cat_sub.strip()[:100])
+            elif result is False:
+                categorical_pass = False
+                break
+
+        if not categorical_pass:
+            continue
+
+        # All resolvable conditions passed
+        return {
+            "rule_id": rule.get("id", rule.get("_hash", "unknown")),
+            "confidence": rule.get("confidence", 0),
+            "conditions": conditions[:200],
+            "unit": "",
+            "impact": rule.get("action", ""),
+            "matched_row": row,
+            "unchecked_conditions": unchecked_conditions,
+            **triggered_details,
                 }
         return None
     else:
