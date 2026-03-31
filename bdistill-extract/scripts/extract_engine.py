@@ -215,26 +215,53 @@ def _check_kb_contradictions(answer: str, kb_path: str) -> list[dict]:
 # ── Quality scoring ────────────────────────────────────────────
 
 def score_entry(answer: str, challenge_responses: list[str] | None = None) -> dict:
-    """Score an entry's quality based on content analysis."""
-    lower = answer.lower()
-    word_count = len(answer.split())
+    """Score an entry's quality based on content analysis.
+
+    Analyzes BOTH the original answer AND the challenge responses together.
+    """
+    # Combine all text for analysis (answer + challenge responses)
+    all_text = answer
+    if challenge_responses:
+        all_text = answer + " " + " ".join(challenge_responses)
+
+    lower = all_text.lower()
+    word_count = len(answer.split())  # word count is answer only (not inflated by challenges)
 
     # Base score from content quality
     score = 0.5
 
-    # Specificity: numbers, named entities, regulations
-    has_numbers = bool(re.search(r'\d+%|\d+\.\d+|\bBRL\b|\bR\$|\$\d', answer))
-    named_entities = len(re.findall(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+', answer))
-    has_regulations = bool(re.search(r'Art\.\s*\d+|Circular\s+\d+|Lei\s+\d+|Section\s+\d+', answer))
+    # Specificity: numbers — match decimals, percentages, currencies, plain integers
+    has_numbers = bool(re.search(r'\d+[%.]|\d+\s*(?:hours?|days?|minutes?|seconds?|months?)|\bBRL\b|\bR\$|\$\d|\b\d{2,}\b', all_text))
+
+    # Named entities: Title Case multi-word + ALL-CAPS acronyms (CVSS, CISA, NIST, CISO, etc.)
+    title_case = re.findall(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+', all_text)
+    acronyms = re.findall(r'\b[A-Z]{2,6}\b', all_text)
+    # Filter common words that happen to be caps (IF, THEN, AND, OR, NOT, SLA, EDD)
+    acronym_stopwords = {"IF", "THEN", "AND", "OR", "NOT", "THE", "FOR", "BUT", "ALL", "ANY", "SLA"}
+    acronyms = [a for a in acronyms if a not in acronym_stopwords]
+    named_entities = len(set(title_case)) + len(set(acronyms))
+
+    # Regulations: broader pattern matching
+    has_regulations = bool(re.search(
+        r'Art\.\s*\d+|Circular\s+\d+|Lei\s+\d+|Section\s+\d+|'
+        r'BOD\s+\d+|NIST\s+SP\s+\d+|ISO\s+\d+|CFR\s+\d+|'
+        r'RDC\s+\d+|Directive\s+\d+|Regulation\s+\d+|'
+        r'PCI\s+DSS|SOX|GDPR|HIPAA|CCPA|Basel\s+III',
+        all_text, re.IGNORECASE
+    ))
 
     if has_numbers:
         score += 0.10
-    if named_entities >= 2:
+    if named_entities >= 3:
         score += 0.10
+    elif named_entities >= 1:
+        score += 0.05
     if has_regulations:
         score += 0.10
 
     # Depth
+    if word_count >= 50:
+        score += 0.03
     if word_count >= 100:
         score += 0.05
     if word_count >= 200:
@@ -243,16 +270,25 @@ def score_entry(answer: str, challenge_responses: list[str] | None = None) -> di
     # Structure
     if re.search(r'^\s*\d+[\.\)]\s', answer, re.MULTILINE):
         score += 0.05
-    if any(w in lower for w in ["if ", "then ", "when "]):
+    if any(w in answer.lower() for w in ["if ", "then ", "when "]):
         score += 0.05
 
-    # Challenge response quality
+    # Challenge response quality (self-correction is the strongest signal)
+    self_corrected = False
     if challenge_responses:
         for resp in challenge_responses:
             resp_lower = resp.lower()
-            if any(w in resp_lower for w in ["actually", "to correct", "more accurately", "i should clarify"]):
-                score += 0.03  # self-correction = honest = good
-            if any(w in resp_lower for w in ["study", "evidence", "according to", "data shows"]):
+            if any(w in resp_lower for w in [
+                "actually", "to correct", "more accurately", "i should clarify",
+                "i was imprecise", "upon reflection", "to be more precise",
+                "i need to revise", "i misstated", "correction:",
+            ]):
+                score += 0.05
+                self_corrected = True
+            if any(w in resp_lower for w in [
+                "study", "evidence", "according to", "data shows",
+                "published", "research", "documented", "per ",
+            ]):
                 score += 0.05
             if any(w in resp_lower for w in ["however", "limitation", "caveat", "exception"]):
                 score += 0.03
@@ -264,10 +300,7 @@ def score_entry(answer: str, challenge_responses: list[str] | None = None) -> di
         "named_entities": named_entities,
         "has_regulations": has_regulations,
         "word_count": word_count,
-        "self_corrected": any(
-            any(w in r.lower() for w in ["actually", "to correct", "more accurately"])
-            for r in (challenge_responses or [])
-        ),
+        "self_corrected": self_corrected,
     }
 
 
