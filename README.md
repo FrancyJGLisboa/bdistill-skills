@@ -17,23 +17,31 @@ npx skills add FrancyJGLisboa/bdistill-skills          # auto-detects your AI to
 ```
 
 ```
-# 2. Tell your AI agent:
+# 2. Extract — tell your AI agent:
 "Extract rules about [your niche topic]"
 
-# That's it. The agent follows the extraction protocol:
+# The agent follows the extraction protocol automatically:
 # → generates targeted questions → answers them → challenges its own claims
 # → scores quality → writes validated rules to data/rules/base/your-domain.jsonl
 ```
 
 ```
-# 3. Then:
-"Export as system prompt for Claude Project"     # → paste into your AI tool
-"Validate the KB"                                # → check for hallucinated numbers
-"Predict: will X happen?"                        # → structured forecast with evidence
+# 3. Validate — immediately after extracting:
+"Validate the KB"
+
+# The agent re-asks every numeric claim 5 different ways + checks structural stability.
+# Numbers that vary → flagged as hallucinated. Conditions that appear/disappear → flagged as unstable.
+# Only stable entries survive. This is what separates a trusted KB from a chat log.
+```
+
+```
+# 4. Use it:
+"Export as system prompt for Claude Project"     # → paste into your AI tool, done
+"Predict: will X happen?"                        # → structured forecast grounded in your KB
 "Check rules against live data"                  # → which rules are triggered right now?
 ```
 
-No Python required for the basic flow. The scripts in `scripts/` add rigor (adversarial depth, checkpointing, consistency probing) when you're ready.
+**Extract → Validate is the minimum viable workflow.** Don't skip validation — an unvalidated KB is just organized hallucinations. The scripts in `scripts/` add more rigor (adversarial depth levels, cross-KB contradiction detection, checkpointing) when you're ready.
 
 ## How it works
 
