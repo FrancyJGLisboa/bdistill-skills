@@ -105,32 +105,149 @@ FETCHERS = {
 # Rule checking
 # ---------------------------------------------------------------------------
 
+# Structured condition: field > 123
 _OPERATOR_RE = re.compile(r"([a-z_]+)\s*(>=|<=|>|<|==|!=)\s*([0-9.]+)")
+
+# Natural language threshold: "exceeds BRL 50,000" or "above 100,000" or "> R$50K"
+_NL_THRESHOLD_RE = re.compile(
+    r"(?:exceeds?|above|over|greater\s+than|more\s+than|surpass(?:es)?|>)\s+"
+    r"(?:R\$|BRL|US\$|USD|\$|€|£)?\s*"
+    r"([\d,]+(?:\.\d+)?)\s*"
+    r"([KkMmBb])?",
+    re.IGNORECASE,
+)
+_NL_BELOW_RE = re.compile(
+    r"(?:below|under|less\s+than|fewer\s+than|<)\s+"
+    r"(?:R\$|BRL|US\$|USD|\$|€|£)?\s*"
+    r"([\d,]+(?:\.\d+)?)\s*"
+    r"([KkMmBb])?",
+    re.IGNORECASE,
+)
+
+# Keyword → CSV column name mapping (common patterns)
+_FIELD_KEYWORDS = {
+    "transaction": ["transaction_amount", "amount", "value", "transaction_value"],
+    "cash": ["transaction_amount", "cash_amount", "amount"],
+    "cumulative": ["cumulative_30d", "cumulative", "total_30d", "rolling_30d"],
+    "pep": ["is_pep", "pep", "pep_status"],
+    "age": ["age", "hull_age", "customer_age"],
+    "temperature": ["temperature", "temp", "temperature_2m_max"],
+    "precipitation": ["precipitation", "precip", "precipitation_sum"],
+    "price": ["price", "close", "last_price"],
+    "spread": ["spread", "basis", "differential"],
+    "volume": ["volume", "transaction_volume", "trade_volume"],
+}
+
+_SUFFIX_MAP = {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}
+
+
+def _parse_threshold(text: str) -> tuple[float | None, str]:
+    """Extract threshold and direction from natural language conditions."""
+    # Try structured format first
+    m = _OPERATOR_RE.search(text.lower().replace(",", "").replace("$", ""))
+    if m:
+        return float(m.group(3)), m.group(2)
+
+    # Try natural language "exceeds X"
+    m = _NL_THRESHOLD_RE.search(text)
+    if m:
+        val = float(m.group(1).replace(",", ""))
+        suffix = (m.group(2) or "").lower()
+        val *= _SUFFIX_MAP.get(suffix, 1)
+        return val, ">"
+
+    # Try "below X"
+    m = _NL_BELOW_RE.search(text)
+    if m:
+        val = float(m.group(1).replace(",", ""))
+        suffix = (m.group(2) or "").lower()
+        val *= _SUFFIX_MAP.get(suffix, 1)
+        return val, "<"
+
+    return None, ""
+
+
+def _find_field(conditions: str, data_fields: list[str]) -> str | None:
+    """Map a natural language condition to a data field by keyword matching."""
+    cond_lower = conditions.lower()
+
+    # First: try direct field name match
+    for field in data_fields:
+        if field.lower() in cond_lower:
+            return field
+
+    # Second: try keyword → field mapping
+    # Prefer the keyword that appears EARLIEST in the condition (likely the subject)
+    matches = []
+    for keyword, candidate_fields in _FIELD_KEYWORDS.items():
+        pos = cond_lower.find(keyword)
+        if pos >= 0:
+            for cf in candidate_fields:
+                if cf in data_fields:
+                    matches.append((pos, cf))
+                    break
+
+    if matches:
+        # Return the field whose keyword appears earliest in the condition
+        matches.sort()  # lowest position = earliest mention
+        return matches[0][1]
+
+    return None
 
 
 def check_rule(rule: dict, data: dict | list) -> dict | None:
     """Check a single rule against fetched data.
 
     Returns a triggered-report dict if the rule fires, None otherwise.
-    Matching is best-effort keyword parsing of the conditions text.
+    Handles both structured conditions (field > 123) and natural language
+    ("single cash transaction exceeds BRL 50,000").
     """
-    conditions = rule.get("conditions", "") or rule.get("answer", "")
-    match = _OPERATOR_RE.search(conditions.lower().replace(",", "").replace("$", ""))
-    if not match:
+    conditions = rule.get("conditions", "") or rule.get("text", "") or rule.get("answer", "")
+    threshold, operator = _parse_threshold(conditions)
+    if threshold is None:
         return None
 
-    field, op, threshold_str = match.group(1), match.group(2), match.group(3)
-    threshold = float(threshold_str)
+    # Get available data fields
+    if isinstance(data, dict):
+        data_fields = list(data.keys())
+    elif isinstance(data, list) and data:
+        data_fields = list(data[0].keys()) if isinstance(data[0], dict) else []
+    else:
+        return None
 
-    # Resolve current value from data
-    current = None
+    field = _find_field(conditions, data_fields)
+    if field is None:
+        return None
+
+    # Get current value(s)
     if isinstance(data, dict):
         current = data.get(field)
-    elif isinstance(data, list) and data:
-        # For CSV: try to aggregate or use the last row
-        current = data[-1].get(field)
-
-    if current is None:
+    elif isinstance(data, list):
+        # For CSV with multiple rows: check each row, trigger on any
+        for row in data:
+            val = row.get(field)
+            try:
+                val = float(val)
+            except (ValueError, TypeError):
+                continue
+            ops = {">": val > threshold, "<": val < threshold,
+                   ">=": val >= threshold, "<=": val <= threshold,
+                   "==": val == threshold, "!=": val != threshold}
+            if ops.get(operator, False):
+                return {
+                    "rule_id": rule.get("id", rule.get("_hash", "unknown")),
+                    "confidence": rule.get("confidence", 0),
+                    "conditions": conditions[:200],
+                    "current_value": val,
+                    "threshold": threshold,
+                    "field": field,
+                    "operator": operator,
+                    "unit": "",
+                    "impact": rule.get("action", ""),
+                    "matched_row": row,
+                }
+        return None
+    else:
         return None
 
     try:
@@ -167,10 +284,19 @@ def load_rules(paths: list[str]) -> list[dict]:
     rules: list[dict] = []
     for p in paths:
         path = Path(p)
-        text = path.read_text()
-        if text.strip().startswith("["):
+        text = path.read_text().strip()
+        if text.startswith("{"):
+            # JSON object — likely bdistill export format {metadata, rules, context}
+            data = json.loads(text)
+            if "rules" in data and isinstance(data["rules"], list):
+                entries = data["rules"]
+            else:
+                entries = [data]
+        elif text.startswith("["):
+            # JSON array
             entries = json.loads(text)
         else:
+            # JSONL — one entry per line
             entries = [json.loads(line) for line in text.splitlines() if line.strip()]
         for entry in entries:
             score = entry.get("confidence", entry.get("quality_score", 1.0))
