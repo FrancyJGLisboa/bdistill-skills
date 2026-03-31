@@ -59,6 +59,29 @@ npx skills add FrancyJGLisboa/bdistill-skills          # auto-detects your AI to
 
 **Extract → Validate is the minimum viable workflow.** Don't skip validation — an unvalidated KB is just organized hallucinations. The scripts in `scripts/` add more rigor (adversarial depth levels, cross-KB contradiction detection, checkpointing) when you're ready.
 
+## What you can extract
+
+LLMs have absorbed vast structured knowledge from academic papers, regulatory filings, technical manuals, and professional literature. Most of it is inaccessible through normal chat — you get vague summaries instead of specific thresholds. bdistill-skills forces it out as validated, structured rules anyone can use downstream.
+
+**Any topic where decisions depend on thresholds, conditions, or expert judgment is a target.**
+
+| What you ask | What you get | Downstream use |
+|---|---|---|
+| "Oil price ripple effects on nitrogen fertilizers from Hormuz strait tensions" | Causal chain: chokepoint disruption scenarios → crude/gas price thresholds → ammonia production cost curves → urea/UAN pricing rules → farmer application rate responses | Monitoring agent watches oil + gas + urea prices, alerts when chain triggers |
+| "Crop yield response to nitrogen fertilizer by soil classification" | IF-THEN rules: response curves by soil type (sandy loam vs clay vs cerrado latossolo), diminishing return thresholds, economic optimum rates per crop-soil combination | Precision ag recommendation system: given soil test + fertilizer price → recommend N rate |
+| "Minimum soil requirements determining crop suitability" | Threshold rules per crop: pH range, drainage class, depth to hardpan, organic matter %, CEC, slope, frost risk — with exceptions and marginal conditions | Land evaluation tool: given soil survey data → which crops are viable? |
+| "ANVISA drug approval pathway timelines and rejection triggers" | Stage-gate rules: pre-clinical requirements, Phase I/II/III criteria, dossier completeness thresholds, clock-stop triggers, post-market surveillance conditions | Regulatory tracker: monitors submission status, predicts approval timeline |
+| "Marine cargo insurance classification by vessel and route" | Classification rules: hull age limits, flag state risk tiers, war-risk zone definitions, cargo hazard class interactions, seasonal weather exclusions | Underwriting engine: given vessel + route + cargo → risk class + premium adjustment |
+| "Basel III capital adequacy impact on lending by asset class" | Transmission rules: RWA weights per asset class, capital buffer triggers, countercyclical surcharges, GSIB buffers, leverage ratio thresholds | Credit risk model: given bank capital position → lending capacity by sector |
+| "Clinical trial eligibility criteria for Type 2 diabetes drugs" | Inclusion/exclusion rules: HbA1c range, eGFR thresholds, prior medication washout, cardiovascular risk exclusions, age/BMI boundaries | Patient screening system: given patient profile → eligible for which trials? |
+| "Real estate rental comp analysis rules by market segment" | Valuation rules: comparable selection criteria (distance, age, size, amenity class), adjustment factors per differentiator, cap rate thresholds by submarket | Pricing tool: given property profile → recommended rent range with cited comps |
+| "Cybersecurity incident severity classification and response timelines" | Triage rules: CVSS score → severity tier → response SLA → escalation path → notification obligations (GDPR 72h, SEC 4 days, sector-specific) | Incident response automation: given alert data → classify, route, set clock |
+| "Podcast audience growth signals and monetization thresholds" | Milestone rules: download thresholds for sponsorship tiers, engagement rate benchmarks, niche vs broad audience economics, platform-specific monetization gates | Creator analytics dashboard: given show metrics → "ready for mid-roll ads" |
+
+**The protocol is always the same:** describe what you need → agent structures the extraction → adversarial challenges force specificity → validation filters hallucinations → you get a KB file of structured rules your agents can consume.
+
+The topics above span agriculture, pharma, insurance, banking, clinical trials, real estate, cybersecurity, and media. They all work because the protocol doesn't care about the domain — it cares about extracting **thresholds, conditions, and decision logic** from whatever the LLM knows.
+
 ## How it works
 
 A knowledge worker extracts their niche expertise into a KB. An AI agent cross-checks that KB against current data. The result is a recommendation system built from real domain intelligence — no coding required.
