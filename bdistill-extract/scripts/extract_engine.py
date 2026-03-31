@@ -1,6 +1,7 @@
 """
 Standalone extraction engine for bdistill-extract skill.
 Generates questions, challenges answers, scores quality, writes JSONL.
+Supports pipeline checkpointing and resume.
 
 No MCP server needed. No dependencies beyond stdlib.
 
@@ -9,6 +10,8 @@ Usage (called by the AI agent, not by humans directly):
     python extract_engine.py challenge --answer "IF transaction > 50K THEN file SAR"
     python extract_engine.py score --original "..." --challenge-type evidence --response "..."
     python extract_engine.py write-entry --domain aml-compliance --entry '{...}'
+    python extract_engine.py checkpoint --session-id abc123 --step "challenge" --data '{...}'
+    python extract_engine.py resume --session-id abc123
 """
 
 import argparse
@@ -260,6 +263,72 @@ def write_entry(domain: str, entry: dict, mode: str = "knowledge") -> dict:
     return {"action": action, "path": str(path), "total_entries": len(existing)}
 
 
+# ── Pipeline checkpointing ────────────────────────────────────
+
+CHECKPOINT_DIR = Path("data/extract/checkpoints")
+
+
+def save_checkpoint(session_id: str, step: str, data: dict) -> dict:
+    """Save pipeline state so it can resume after interruption."""
+    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    path = CHECKPOINT_DIR / f"{session_id}.json"
+
+    state = {}
+    if path.exists():
+        with open(path) as f:
+            state = json.load(f)
+
+    state[step] = {
+        "data": data,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    state["last_step"] = step
+    state["session_id"] = session_id
+
+    with open(path, "w") as f:
+        json.dump(state, f, indent=2, default=str)
+
+    return {"saved": str(path), "step": step, "steps_completed": list(state.keys())}
+
+
+def resume_checkpoint(session_id: str) -> dict:
+    """Load checkpoint state to resume an interrupted pipeline."""
+    path = CHECKPOINT_DIR / f"{session_id}.json"
+    if not path.exists():
+        return {"error": f"No checkpoint found for session {session_id}"}
+
+    with open(path) as f:
+        state = json.load(f)
+
+    # Determine next step
+    step_order = ["generate", "answer", "challenge", "score", "write"]
+    last = state.get("last_step", "")
+    if last in step_order:
+        idx = step_order.index(last)
+        next_step = step_order[idx + 1] if idx + 1 < len(step_order) else "done"
+    else:
+        next_step = "generate"
+
+    # Count questions answered so far
+    answer_data = state.get("answer", {}).get("data", {})
+    questions_answered = answer_data.get("questions_answered", 0)
+    total_questions = answer_data.get("total_questions", 0)
+    entries_written = state.get("write", {}).get("data", {}).get("entries_written", 0)
+    domain = state.get("generate", {}).get("data", {}).get("domain", "")
+
+    return {
+        "session_id": session_id,
+        "domain": domain,
+        "last_step": last,
+        "next_step": next_step,
+        "steps_completed": [s for s in step_order if s in state],
+        "questions_answered": questions_answered,
+        "total_questions": total_questions,
+        "entries_written": entries_written,
+        "data": state,
+    }
+
+
 # ── CLI ────────────────────────────────────────────────────────
 
 def main():
@@ -271,22 +340,36 @@ def main():
     gen.add_argument("--terms", nargs="+", required=True)
     gen.add_argument("--mode", choices=["knowledge", "rules"], default="knowledge")
     gen.add_argument("--per-term", type=int, default=5)
+    gen.add_argument("--session-id", default=None, help="Session ID for checkpoint tracking")
 
     # challenge
     ch = sub.add_parser("challenge")
     ch.add_argument("--answer", required=True)
     ch.add_argument("--num", type=int, default=3)
+    ch.add_argument("--session-id", default=None, help="Session ID for checkpoint tracking")
 
     # score
     sc = sub.add_parser("score")
     sc.add_argument("--answer", required=True)
     sc.add_argument("--challenge-responses", nargs="*", default=[])
+    sc.add_argument("--session-id", default=None, help="Session ID for checkpoint tracking")
 
     # write-entry
     wr = sub.add_parser("write-entry")
     wr.add_argument("--domain", required=True)
     wr.add_argument("--entry", required=True, help="JSON string")
     wr.add_argument("--mode", choices=["knowledge", "rules"], default="knowledge")
+    wr.add_argument("--session-id", default=None, help="Session ID for checkpoint tracking")
+
+    # checkpoint
+    cp = sub.add_parser("checkpoint")
+    cp.add_argument("--session-id", required=True)
+    cp.add_argument("--step", required=True)
+    cp.add_argument("--data", required=True, help="JSON string")
+
+    # resume
+    rs = sub.add_parser("resume")
+    rs.add_argument("--session-id", required=True)
 
     args = parser.parse_args()
 
@@ -305,6 +388,15 @@ def main():
     elif args.command == "write-entry":
         entry = json.loads(args.entry)
         result = write_entry(args.domain, entry, args.mode)
+        json.dump(result, sys.stdout, indent=2)
+
+    elif args.command == "checkpoint":
+        data = json.loads(args.data)
+        result = save_checkpoint(args.session_id, args.step, data)
+        json.dump(result, sys.stdout, indent=2)
+
+    elif args.command == "resume":
+        result = resume_checkpoint(args.session_id)
         json.dump(result, sys.stdout, indent=2)
 
     else:
