@@ -8,6 +8,33 @@ Your agents need niche domain knowledge to be actually useful — the thresholds
 
 Works with Claude Code, VS Code Copilot, Cursor, Codex CLI, Windsurf, Cline, and 30+ other agents. No API key. No MCP server. No dependencies.
 
+## Quickstart (30 seconds)
+
+```bash
+# 1. Install (pick your tool)
+npx skills add FrancyJGLisboa/bdistill-skills          # auto-detects your AI tools
+# OR: git clone https://github.com/FrancyJGLisboa/bdistill-skills.git   # manual
+```
+
+```
+# 2. Tell your AI agent:
+"Extract rules about [your niche topic]"
+
+# That's it. The agent follows the extraction protocol:
+# → generates targeted questions → answers them → challenges its own claims
+# → scores quality → writes validated rules to data/rules/base/your-domain.jsonl
+```
+
+```
+# 3. Then:
+"Export as system prompt for Claude Project"     # → paste into your AI tool
+"Validate the KB"                                # → check for hallucinated numbers
+"Predict: will X happen?"                        # → structured forecast with evidence
+"Check rules against live data"                  # → which rules are triggered right now?
+```
+
+No Python required for the basic flow. The scripts in `scripts/` add rigor (adversarial depth, checkpointing, consistency probing) when you're ready.
+
 ## How it works
 
 A knowledge worker extracts their niche expertise into a KB. An AI agent cross-checks that KB against current data. The result is a recommendation system built from real domain intelligence — no coding required.
